@@ -70,6 +70,24 @@ cd AgriYieldAI
 pip install -r requirements.txt
 ```
 
+### ⚠️ Model Files (not in repo — too large for GitHub)
+
+The trained `.pkl` files are excluded from this repository. You need to either:
+
+**Option A — Train the model yourself:**
+```bash
+python app.py   # original Streamlit app that trains and saves the model
+```
+
+**Option B — Download pre-trained files** and place them in the project root:
+```
+AgriYieldAI/
+├── agri_yield_model.pkl
+├── state_encoder.pkl
+├── season_encoder.pkl
+└── crop_encoder.pkl
+```
+
 ### 3. Start the backend
 
 ```bash
