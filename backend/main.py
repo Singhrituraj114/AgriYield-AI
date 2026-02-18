@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List
 import pandas as pd
@@ -16,6 +18,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Serve frontend (for HuggingFace Spaces / single-URL deployment) ──
+BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONT_DIR = os.path.join(BASE_DIR, "frontend")
+if os.path.exists(FRONT_DIR):
+    app.mount("/static", StaticFiles(directory=FRONT_DIR), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def serve_index():
+        return FileResponse(os.path.join(FRONT_DIR, "index.html"))
 
 # ── Paths ──
 BASE      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -741,7 +741,7 @@ Punjab, Whole Year     , Maize, 2024, 300"></textarea>
 // Auto-detect environment
 const API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
   ? "http://localhost:8000"
-  : "";  // same-origin on HuggingFace Spaces
+  : "https://singhrituraj114-agriyield-ai.hf.space";  // HuggingFace Space backend
 let tableData = [];
 let forecastInst = null;
 let chartsLoaded = false;
