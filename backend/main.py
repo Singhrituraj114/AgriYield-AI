@@ -28,11 +28,8 @@ DF = DF.dropna(subset=["Area", "Production"])
 DF = DF[DF["Area"] > 0]
 DF["Yield"] = DF["Production"] / DF["Area"]
 
-X_bg = DF[["State_Name", "Crop_Year", "Season", "Crop", "Area"]].sample(300, random_state=42).copy()
-X_bg["State_Name"] = LE_STATE.transform(X_bg["State_Name"])
-X_bg["Season"]     = LE_SEASON.transform(X_bg["Season"])
-X_bg["Crop"]       = LE_CROP.transform(X_bg["Crop"])
-EXPLAINER = shap.TreeExplainer(MODEL, X_bg)
+# No background data — prevents OOM/segfault on large RandomForest models
+EXPLAINER = shap.TreeExplainer(MODEL)
 
 
 # ── Schemas ──
@@ -125,12 +122,13 @@ def forecast(req: ForecastReq):
 def shap_explain(req: PredictReq):
     try:
         X  = encode(req.state, req.season, req.year, req.crop, req.area)
-        sv = EXPLAINER.shap_values(X)
+        sv = EXPLAINER.shap_values(X, check_additivity=False)
         # sv shape: (n_samples, n_features) — grab first row
-        vals = sv[0] if len(sv.shape) == 2 else sv
+        vals = sv[0] if hasattr(sv, 'shape') and len(sv.shape) == 2 else sv
+        base = float(np.array(EXPLAINER.expected_value).ravel()[0])
         return {
             "shap_values":  [round(float(v), 6) for v in vals],
-            "base_value":   round(float(EXPLAINER.expected_value), 6),
+            "base_value":   round(base, 6),
             "input_values": X.values[0].tolist(),
             "features":     ["State", "Year", "Season", "Crop", "Area"],
         }
