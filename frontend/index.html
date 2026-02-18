@@ -506,7 +506,6 @@ footer .accent{color:var(--accent)}
 </section>
 
 <!-- /PREDICT -->
-</section>
 
 <!-- CROP RECOMMENDER -->
 <section id="recommend">
@@ -525,6 +524,9 @@ footer .accent{color:var(--accent)}
     </div>
   </div>
 </section>
+
+<!-- ANALYTICS DASHBOARD -->
+<section id="analytics">
   <div class="section-title">📊 Analytics Dashboard</div>
   <div class="section-sub">Deep-dive into India's historical crop yield data across states, seasons, and decades.</div>
 
@@ -1790,10 +1792,13 @@ window.addEventListener('DOMContentLoaded',async()=>{
   }
 
   // Load charts when analytics section scrolls into view
-  const io=new IntersectionObserver(entries=>{
-    if(entries[0].isIntersecting){loadCharts();io.disconnect();}
-  },{threshold:.1});
-  io.observe(document.getElementById('analytics'));
+  const analyticsEl = document.getElementById('analytics');
+  if(analyticsEl){
+    const io=new IntersectionObserver(entries=>{
+      if(entries[0].isIntersecting){loadCharts();io.disconnect();}
+    },{threshold:.1});
+    io.observe(analyticsEl);
+  }
 
   // Load history
   renderHistory();
