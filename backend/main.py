@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List
 import pandas as pd
 import numpy as np
 import joblib
@@ -99,7 +100,15 @@ def predict(req: PredictReq):
     try:
         X   = encode(req.state, req.season, req.year, req.crop, req.area)
         yld = float(MODEL.predict(X)[0])
-        return {"yield": round(yld, 4), "production": round(yld * req.area, 4)}
+        # Confidence interval from individual RF trees
+        tree_preds = np.array([float(t.predict(X)[0]) for t in MODEL.estimators_])
+        return {
+            "yield":      round(yld, 4),
+            "production": round(yld * req.area, 4),
+            "conf_low":   round(float(np.percentile(tree_preds, 10)), 4),
+            "conf_high":  round(float(np.percentile(tree_preds, 90)), 4),
+            "conf_std":   round(float(np.std(tree_preds)), 4),
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -240,3 +249,116 @@ def by_crop(crop: str = Query(...), state: str = Query(default=None)):
         "avg_yield":     round(float(cdf["Yield"].mean()), 4),
         "total_records": len(cdf),
     }
+
+
+@app.get("/recommend")
+def recommend(
+    state: str = Query(...),
+    season: str = Query(...),
+    year: int  = Query(...),
+    area: float = Query(...),
+    n: int = 8,
+):
+    """Batch-predict all crops at once and rank by yield — much faster than one-by-one."""
+    rows, valid_crops = [], []
+    for crop in LE_CROP.classes_:
+        try:
+            rows.append([
+                LE_STATE.transform([state])[0],
+                year,
+                LE_SEASON.transform([season])[0],
+                LE_CROP.transform([crop])[0],
+                area,
+            ])
+            valid_crops.append(crop)
+        except Exception:
+            pass
+    if not rows:
+        raise HTTPException(status_code=400, detail="No valid crops found for given inputs")
+    X_all  = pd.DataFrame(rows, columns=FEATURE_COLS)
+    preds  = MODEL.predict(X_all)
+    results = [
+        {"crop": c.strip(), "yield": round(float(p), 4), "production": round(float(p) * area, 4)}
+        for c, p in zip(valid_crops, preds)
+    ]
+    results.sort(key=lambda x: x["yield"], reverse=True)
+    return {"recommendations": results[:n], "state": state, "season": season.strip(), "year": year}
+
+
+class BatchPredictReq(BaseModel):
+    inputs: List[PredictReq]
+
+
+@app.post("/batch-predict")
+def batch_predict(req: BatchPredictReq):
+    """Predict yield for a list of inputs at once."""
+    rows, meta = [], []
+    for item in req.inputs:
+        try:
+            rows.append([
+                LE_STATE.transform([item.state])[0],
+                item.year,
+                LE_SEASON.transform([item.season])[0],
+                LE_CROP.transform([item.crop])[0],
+                item.area,
+            ])
+            meta.append(item)
+        except Exception as e:
+            meta.append({"error": str(e)})
+            rows.append([0, 0, 0, 0, 0])  # placeholder
+    X_all = pd.DataFrame(rows, columns=FEATURE_COLS)
+    preds = MODEL.predict(X_all)
+    results = []
+    for i, item in enumerate(meta):
+        if isinstance(item, dict) and "error" in item:
+            results.append(item)
+        else:
+            yld = float(preds[i])
+            results.append({
+                "state": item.state, "season": item.season.strip(),
+                "crop": item.crop, "year": item.year, "area": item.area,
+                "yield": round(yld, 4), "production": round(yld * item.area, 4),
+            })
+    return {"results": results, "count": len(results)}
+
+
+@app.get("/crop-compare")
+def crop_compare(
+    state:  str   = Query(...),
+    season: str   = Query(...),
+    year:   int   = Query(...),
+    area:   float = Query(...),
+    crops:  str   = Query(...),   # comma-separated crop names
+):
+    """Compare predicted yield across multiple crops."""
+    crop_list = [c.strip() for c in crops.split(",")]
+    rows, valid, errors = [], [], []
+    for crop in crop_list:
+        matched = next((c for c in LE_CROP.classes_ if c.strip() == crop), None)
+        if not matched:
+            errors.append({"crop": crop, "error": f"'{crop}' not in model"})
+            continue
+        try:
+            rows.append([
+                LE_STATE.transform([state])[0],
+                year,
+                LE_SEASON.transform([season])[0],
+                LE_CROP.transform([matched])[0],
+                area,
+            ])
+            valid.append((crop, matched))
+        except Exception as e:
+            errors.append({"crop": crop, "error": str(e)})
+    results = list(errors)
+    if rows:
+        X_all = pd.DataFrame(rows, columns=FEATURE_COLS)
+        preds = MODEL.predict(X_all)
+        for (crop_stripped, matched), yld in zip(valid, preds):
+            hist = DF[DF["Crop"] == matched][DF["State_Name"] == state]["Yield"]
+            results.append({
+                "crop": crop_stripped,
+                "yield": round(float(yld), 4),
+                "production": round(float(yld) * area, 4),
+                "historical_avg": round(float(hist.mean()), 4) if not hist.empty else None,
+            })
+    return {"state": state, "season": season.strip(), "year": year, "area": area, "comparison": results}
