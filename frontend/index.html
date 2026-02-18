@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AgriYield AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link  rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#020d14;
+  --glass:rgba(255,255,255,0.04);
+  --glass-border:rgba(255,255,255,0.09);
+  --accent:#00e5a0;
+  --accent2:#0ea5e9;
+  --accent3:#f59e0b;
+  --accent4:#a78bfa;
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --r:20px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{width:100%;min-height:100vh;background:var(--bg);font-family:'Inter',sans-serif;color:var(--text);overflow-x:hidden}
+
+/* CANVAS */
+#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+
+/* PAGE WRAP */
+.page{position:relative;z-index:1}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 56px;
+  backdrop-filter:blur(24px);border-bottom:1px solid var(--glass-border);
+  background:rgba(2,13,20,0.7);position:sticky;top:0;z-index:200}
+.nav-logo{font-size:1.35rem;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.02em}
+.nav-links{display:flex;gap:36px;align-items:center}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:.88rem;font-weight:500;
+  transition:.25s;cursor:pointer;letter-spacing:.01em}
+.nav-links a:hover{color:var(--accent)}
+.nav-pill{background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#020d14!important;padding:8px 20px;border-radius:999px;font-weight:700!important;
+  font-size:.82rem!important;letter-spacing:.04em}
+
+/* HERO */
+.hero{min-height:94vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;padding:60px 24px 40px;gap:28px;position:relative}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;
+  background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.25);
+  color:var(--accent);padding:7px 20px;border-radius:999px;font-size:.78rem;
+  font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.hero-badge span{width:7px;height:7px;background:var(--accent);border-radius:50%;
+  animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.hero h1{font-size:clamp(3rem,8vw,6.5rem);font-weight:900;line-height:1.04;
+  letter-spacing:-.04em;max-width:900px}
+.hero h1 .g{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 60%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:1.1rem;color:var(--muted);max-width:560px;line-height:1.75}
+.hero-cta{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#020d14;border:none;padding:15px 40px;border-radius:999px;font-size:1rem;
+  font-weight:800;cursor:pointer;transition:.3s;box-shadow:0 0 40px rgba(0,229,160,.25);
+  font-family:inherit;letter-spacing:.01em}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 0 60px rgba(0,229,160,.45)}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--glass-border);
+  padding:15px 40px;border-radius:999px;font-size:1rem;font-weight:600;cursor:pointer;
+  transition:.3s;font-family:inherit}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-3px)}
+.hero-scroll{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:.75rem;
+  letter-spacing:.1em;text-transform:uppercase;animation:bounce 2s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+.scroll-line{width:1px;height:40px;background:linear-gradient(var(--accent),transparent)}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:18px;padding:0 56px 72px}
+.stat-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--r);
+  padding:28px 20px;text-align:center;backdrop-filter:blur(20px);transition:.35s;cursor:default;
+  position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:.35s}
+.stat-card:hover{transform:translateY(-8px);border-color:rgba(0,229,160,.3);
+  box-shadow:0 20px 60px rgba(0,229,160,.1)}
+.stat-card:hover::before{opacity:1}
+.stat-num{font-size:1.9rem;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{font-size:.75rem;color:var(--muted);margin-top:8px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.07em}
+
+/* SECTION */
+section{padding:80px 56px}
+section:nth-child(even){background:rgba(255,255,255,.012)}
+.section-label{font-size:.75rem;font-weight:700;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px}
+.section-title{font-size:2.2rem;font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
+.section-sub{color:var(--muted);font-size:.95rem;margin-bottom:44px;line-height:1.7;max-width:560px}
+
+/* GLASS CARD */
+.glass-card{background:var(--glass);border:1px solid var(--glass-border);
+  border-radius:var(--r);padding:32px;backdrop-filter:blur(24px)}
+
+/* PREDICT SECTION */
+.predict-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+@media(max-width:900px){.predict-grid{grid-template-columns:1fr}}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.form-group{display:flex;flex-direction:column;gap:8px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:.75rem;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em}
+.form-group select,.form-group input[type=number]{
+  background:rgba(255,255,255,.05);border:1px solid var(--glass-border);
+  color:var(--text);padding:13px 16px;border-radius:12px;
+  font-size:.93rem;font-family:inherit;outline:none;transition:.25s;
+  appearance:none;-webkit-appearance:none;cursor:pointer}
+.form-group select:focus,.form-group input[type=number]:focus{
+  border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1);background:rgba(0,229,160,.04)}
+.range-wrap{display:flex;flex-direction:column;gap:10px}
+.range-top{display:flex;justify-content:space-between;align-items:center}
+.range-val{font-size:1rem;font-weight:800;color:var(--accent)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;
+  border-radius:999px;background:rgba(255,255,255,.1);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:18px;height:18px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 12px rgba(0,229,160,.5);transition:.2s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3)}
+.predict-btn{width:100%;margin-top:28px;padding:17px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#020d14;border:none;border-radius:14px;font-size:1rem;font-weight:800;
+  cursor:pointer;transition:.3s;letter-spacing:.02em;font-family:inherit;
+  box-shadow:0 0 30px rgba(0,229,160,.2)}
+.predict-btn:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(0,229,160,.4)}
+.predict-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* RESULT PANEL */
+.result-panel{display:flex;flex-direction:column;gap:18px;min-height:300px}
+.placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:16px;color:var(--muted);text-align:center;padding:60px 20px}
+.placeholder-icon{font-size:3.5rem;opacity:.25;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.result-main{background:linear-gradient(135deg,rgba(0,229,160,.07),rgba(14,165,233,.07));
+  border:1px solid rgba(0,229,160,.2);border-radius:18px;padding:32px;text-align:center}
+.result-main .rlabel{font-size:.75rem;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
+.result-main .rval{font-size:4rem;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.result-main .runit{font-size:.85rem;color:var(--muted);margin-top:8px}
+.result-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.result-mini{border-radius:14px;padding:20px;text-align:center}
+.result-mini.blue{background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2)}
+.result-mini.amber{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2)}
+.result-mini .rlabel{font-size:.72rem;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.result-mini .rval{font-size:1.6rem;font-weight:800}
+.result-mini.blue .rval{color:var(--accent2)}
+.result-mini.amber .rval{color:var(--accent3)}
+.result-info{background:rgba(255,255,255,.03);border-radius:12px;padding:16px;
+  font-size:.83rem;color:var(--muted);line-height:1.8}
+.result-info b{color:var(--text)}
+
+/* FORECAST */
+.forecast-box{margin-top:28px}
+.forecast-box .flabel{font-size:.75rem;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+.forecast-wrap{position:relative;height:200px}
+
+/* ANALYTICS */
+.tab-bar{display:flex;gap:6px;margin-bottom:36px;background:rgba(255,255,255,.03);
+  border-radius:14px;padding:5px;width:fit-content;border:1px solid var(--glass-border)}
+.tab{padding:10px 26px;border-radius:10px;border:none;background:transparent;
+  color:var(--muted);font-size:.88rem;font-weight:600;cursor:pointer;
+  transition:.2s;font-family:inherit}
+.tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#020d14}
+.tab:hover:not(.active){color:var(--text)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px}
+.chart-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--r);
+  padding:28px;backdrop-filter:blur(20px);transition:.3s}
+.chart-card:hover{border-color:rgba(255,255,255,.15);box-shadow:0 8px 40px rgba(0,0,0,.3)}
+.chart-card h3{font-size:.92rem;font-weight:700;margin-bottom:20px;
+  color:var(--text);letter-spacing:-.01em}
+.chart-area{position:relative;height:270px}
+.chart-area.tall{height:360px}
+
+/* SHAP */
+.shap-info{font-size:.82rem;color:var(--muted);margin-bottom:24px;line-height:1.8}
+.shap-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.shap-label{width:72px;font-size:.8rem;color:var(--muted);font-weight:700;
+  text-align:right;flex-shrink:0;text-transform:uppercase;letter-spacing:.05em}
+.shap-bar-bg{flex:1;height:32px;background:rgba(255,255,255,.04);
+  border-radius:10px;overflow:hidden;border:1px solid var(--glass-border)}
+.shap-bar{height:100%;border-radius:9px;transition:width 1.2s cubic-bezier(.16,1,.3,1);
+  display:flex;align-items:center;padding:0 12px;font-size:.76rem;font-weight:800;
+  color:#020d14;min-width:4px;white-space:nowrap}
+.shap-val{width:80px;font-size:.82rem;font-weight:800;flex-shrink:0}
+.shap-base{display:inline-flex;align-items:center;gap:10px;
+  background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.15);
+  padding:10px 18px;border-radius:10px;font-size:.83rem;margin-bottom:24px}
+
+/* DATA TABLE */
+.tbl-toolbar{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.tbl-search{flex:1;min-width:220px;background:rgba(255,255,255,.05);
+  border:1px solid var(--glass-border);color:var(--text);padding:11px 16px;
+  border-radius:12px;font-size:.9rem;font-family:inherit;outline:none;transition:.2s}
+.tbl-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1)}
+.tbl-refresh{background:transparent;color:var(--muted);border:1px solid var(--glass-border);
+  padding:11px 20px;border-radius:12px;font-size:.85rem;cursor:pointer;
+  font-family:inherit;transition:.2s;white-space:nowrap}
+.tbl-refresh:hover{color:var(--accent);border-color:var(--accent)}
+.tbl-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--glass-border)}
+table{width:100%;border-collapse:collapse;font-size:.84rem}
+thead tr{background:rgba(255,255,255,.05)}
+th{padding:14px 18px;text-align:left;font-weight:700;color:var(--muted);
+  font-size:.73rem;text-transform:uppercase;letter-spacing:.08em;
+  border-bottom:1px solid var(--glass-border);white-space:nowrap}
+td{padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.035);white-space:nowrap}
+tbody tr{transition:.2s}
+tbody tr:hover{background:rgba(0,229,160,.03)}
+tbody tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;
+  font-size:.72rem;font-weight:700;letter-spacing:.04em}
+.badge-kharif{background:rgba(245,158,11,.15);color:var(--accent3)}
+.badge-rabi{background:rgba(14,165,233,.15);color:var(--accent2)}
+.badge-whole{background:rgba(0,229,160,.12);color:var(--accent)}
+.badge-other{background:rgba(167,139,250,.12);color:var(--accent4)}
+.tbl-foot{display:flex;justify-content:space-between;align-items:center;
+  margin-top:14px;font-size:.8rem;color:var(--muted)}
+
+/* TOAST */
+#toast{position:fixed;bottom:32px;right:32px;z-index:9999;
+  background:rgba(2,13,20,.95);border:1px solid rgba(0,229,160,.4);
+  color:var(--accent);padding:14px 24px;border-radius:14px;
+  font-size:.88rem;font-weight:600;backdrop-filter:blur(20px);
+  opacity:0;transform:translateY(20px);transition:.4s cubic-bezier(.16,1,.3,1);pointer-events:none;
+  box-shadow:0 8px 32px rgba(0,229,160,.15)}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.error{border-color:rgba(248,113,113,.4);color:#f87171;box-shadow:0 8px 32px rgba(248,113,113,.1)}
+
+/* SPINNER */
+.spinner{width:36px;height:36px;border:3px solid rgba(0,229,160,.1);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;margin:40px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* FOOTER */
+footer{text-align:center;padding:48px 24px;color:var(--muted);
+  font-size:.83rem;border-top:1px solid var(--glass-border);line-height:2}
+footer .accent{color:var(--accent)}
+
+/* FADE-UP */
+.fu{opacity:0;transform:translateY(36px)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.15)}
+
+/* MAP */
+#india-map{height:520px;border-radius:16px;background:#0a1a24;z-index:1}
+.leaflet-container{background:#0a1a24!important;font-family:'Inter',sans-serif}
+.leaflet-popup-content-wrapper{background:rgba(2,13,20,.95);color:#e2e8f0;
+  border:1px solid rgba(0,229,160,.3);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.leaflet-popup-tip{background:rgba(2,13,20,.95)}
+.leaflet-popup-content{margin:12px 16px;font-size:.85rem;line-height:1.8}
+.map-legend{background:rgba(2,13,20,.9);padding:14px 18px;border-radius:12px;
+  border:1px solid var(--glass-border);font-size:.78rem;line-height:2;color:var(--muted)}
+.map-legend b{color:var(--text);display:block;margin-bottom:6px;font-size:.82rem}
+.legend-item{display:flex;align-items:center;gap:8px}
+.legend-swatch{width:14px;height:14px;border-radius:4px;flex-shrink:0}
+.map-overlay-info{background:rgba(2,13,20,.88);padding:12px 18px;border-radius:12px;
+  border:1px solid var(--glass-border);font-size:.82rem;color:var(--muted);pointer-events:none}
+
+/* CONTEXTUAL ANALYSIS */
+.ctx-section{margin-top:40px}
+.ctx-header{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.ctx-title{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
+.ctx-badge{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;
+  background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);
+  border-radius:999px;font-size:.78rem;font-weight:700;color:var(--accent)}
+.ctx-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:28px}
+.ctx-stat{background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;
+  padding:18px;text-align:center}
+.ctx-stat .cv{font-size:1.5rem;font-weight:800;color:var(--accent)}
+.ctx-stat .cl{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;
+  letter-spacing:.07em;margin-top:4px}
+.ctx-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:22px}
+
+@media(max-width:700px){
+  nav{padding:16px 24px}
+  section{padding:60px 24px}
+  .stats-row{padding:0 24px 52px}
+  .form-grid{grid-template-columns:1fr}
+  .form-group.full{grid-column:1}
+  .charts-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="page">
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">🌾 AgriYield AI</div>
+  <div class="nav-links">
+    <a onclick="nav('hero')">Home</a>
+    <a onclick="nav('predict')">Predict</a>
+    <a onclick="nav('analytics')">Analytics</a>
+    <a onclick="nav('data')">Data</a>
+    <a class="nav-pill" onclick="nav('predict')">Try Now →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="hero-badge"><span></span>Live AI Predictions</div>
+  <h1>India's Smartest<br/><span class="g">Crop Yield AI</span></h1>
+  <p>246,000+ records. RandomForest ML model. SHAP explainability. Real-time predictions for any state, crop, and season across India.</p>
+  <div class="hero-cta">
+    <button class="btn-primary" onclick="nav('predict')">⚡ Start Predicting</button>
+    <button class="btn-ghost" onclick="nav('analytics')">📊 View Analytics</button>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    scroll
+  </div>
+</section>
+
+<!-- STATS ROW -->
+<div class="stats-row" id="stats-row">
+  <div class="stat-card fu"><div class="stat-num" id="s-records">—</div><div class="stat-label">Total Records</div></div>
+  <div class="stat-card fu"><div class="stat-num" id="s-states">—</div><div class="stat-label">States</div></div>
+  <div class="stat-card fu"><div class="stat-num" id="s-crops">—</div><div class="stat-label">Crop Types</div></div>
+  <div class="stat-card fu"><div class="stat-num" id="s-seasons">—</div><div class="stat-label">Seasons</div></div>
+  <div class="stat-card fu"><div class="stat-num" id="s-years">—</div><div class="stat-label">Year Range</div></div>
+  <div class="stat-card fu"><div class="stat-num" id="s-yield">—</div><div class="stat-label">Avg Yield T/Ha</div></div>
+</div>
+
+<!-- PREDICT -->
+<section id="predict">
+  <div class="section-label">AI Prediction Engine</div>
+  <div class="section-title">🔮 Yield Predictor</div>
+  <div class="section-sub">Enter your farm parameters below to get an instant AI-powered yield and production estimate with SHAP explainability.</div>
+
+  <div class="predict-grid">
+    <!-- FORM CARD -->
+    <div class="glass-card fu">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>State</label>
+          <select id="f-state"><option>Loading…</option></select>
+        </div>
+        <div class="form-group">
+          <label>Season</label>
+          <select id="f-season"><option>Loading…</option></select>
+        </div>
+        <div class="form-group">
+          <label>Crop</label>
+          <select id="f-crop"><option>Loading…</option></select>
+        </div>
+        <div class="form-group full">
+          <div class="range-wrap">
+            <div class="range-top">
+              <label>Crop Year</label>
+              <span class="range-val" id="year-val">2025</span>
+            </div>
+            <input type="range" id="f-year" min="2000" max="2035" value="2025"
+              oninput="document.getElementById('year-val').textContent=this.value"/>
+          </div>
+        </div>
+        <div class="form-group full">
+          <div class="range-wrap">
+            <div class="range-top">
+              <label>Area (Hectares)</label>
+              <span class="range-val" id="area-val">50</span>
+            </div>
+            <input type="range" id="f-area" min="1" max="1000" value="50" step="1"
+              oninput="document.getElementById('area-val').textContent=this.value"/>
+          </div>
+        </div>
+      </div>
+      <button class="predict-btn" id="predict-btn" onclick="runPredict()">⚡ Predict Yield</button>
+
+      <!-- FORECAST CHART -->
+      <div id="forecast-box" class="forecast-box" style="display:none">
+        <div class="flabel">📈 5-Year Forecast</div>
+        <div class="forecast-wrap"><canvas id="forecast-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- RESULT CARD -->
+    <div class="glass-card fu result-panel" id="result-panel">
+      <div class="placeholder">
+        <div class="placeholder-icon">🌱</div>
+        <div style="font-weight:700;font-size:1rem;color:var(--text)">Awaiting Prediction</div>
+        <div style="font-size:.85rem">Configure your farm parameters and hit Predict</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ANALYTICS -->
+<section id="analytics">
+  <div class="section-label">Data Intelligence</div>
+  <div class="section-title">📊 Analytics Dashboard</div>
+  <div class="section-sub">Deep-dive into India's historical crop yield data across states, seasons, and decades.</div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('charts',this)">📈 Charts</button>
+    <button class="tab" onclick="switchTab('shap',this)">🧠 SHAP XAI</button>
+    <button class="tab" onclick="switchTab('map',this);initMap()">🗺️ India Map</button>
+  </div>
+
+  <div class="tab-pane active" id="pane-charts">
+    <div class="charts-grid">
+      <div class="chart-card fu">
+        <h3>🏆 Top 10 Crops by Avg Yield</h3>
+        <div class="chart-area"><canvas id="chart-topcrop"></canvas></div>
+      </div>
+      <div class="chart-card fu">
+        <h3>🌤️ Season-wise Yield (Mean vs Median)</h3>
+        <div class="chart-area"><canvas id="chart-season"></canvas></div>
+      </div>
+      <div class="chart-card fu" style="grid-column:1/-1">
+        <h3>📅 Yearly Average Yield Trend</h3>
+        <div class="chart-area" style="height:220px"><canvas id="chart-trend"></canvas></div>
+      </div>
+      <div class="chart-card fu" style="grid-column:1/-1">
+        <h3>🗺️ Top 25 States by Avg Yield</h3>
+        <div class="chart-area tall"><canvas id="chart-state"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane" id="pane-shap">
+    <div class="glass-card fu">
+      <div style="font-size:1.05rem;font-weight:700;margin-bottom:8px">🧠 SHAP Feature Importance</div>
+      <div class="shap-info">
+        SHAP (SHapley Additive exPlanations) breaks down how each input feature
+        pushes the model's prediction up or down from the baseline.
+        <b style="color:var(--accent)">Green bars</b> increase yield,
+        <b style="color:#f87171">red bars</b> decrease it.
+        Run a prediction first to see live SHAP values.
+      </div>
+      <div id="shap-content">
+        <div class="placeholder" style="padding:48px">
+          <div class="placeholder-icon">🧬</div>
+          <div style="font-weight:700;color:var(--text)">Run a prediction to see SHAP values</div>
+          <div style="font-size:.85rem">Go to the Predict section above first</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane" id="pane-map">
+    <div class="glass-card fu">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:1.05rem;font-weight:700;margin-bottom:6px">🗺️ India State Yield Choropleth</div>
+          <div style="font-size:.83rem;color:var(--muted)">Average yield (T/Ha) per state. Hover a state for details. Click to filter.</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <select id="map-metric" onchange="refreshMap()"
+            style="background:rgba(255,255,255,.06);border:1px solid var(--glass-border);
+            color:var(--text);padding:9px 14px;border-radius:10px;font-family:inherit;
+            font-size:.83rem;outline:none;cursor:pointer">
+            <option value="avg">Avg Yield (all crops)</option>
+            <option value="filtered">Filtered by prediction params</option>
+          </select>
+        </div>
+      </div>
+      <div id="india-map"></div>
+      <div id="map-selected-info" style="margin-top:14px;font-size:.82rem;color:var(--muted);text-align:center">
+        Hover over a state to see details
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTEXTUAL ANALYSIS -->
+<section id="contextual" style="display:none">
+  <div class="section-label">Contextual Intelligence</div>
+  <div class="section-title">📍 Analysis for Your Prediction</div>
+  <div class="section-sub" id="ctx-sub">Showing data filtered by your selected parameters.</div>
+
+  <div class="ctx-stats" id="ctx-stats"></div>
+
+  <div class="ctx-charts">
+    <div class="chart-card fu">
+      <h3 id="ctx-chart1-title">Top Crops in Selected State</h3>
+      <div class="chart-area"><canvas id="ctx-chart1"></canvas></div>
+    </div>
+    <div class="chart-card fu">
+      <h3 id="ctx-chart2-title">Season Distribution for Selected State</h3>
+      <div class="chart-area"><canvas id="ctx-chart2"></canvas></div>
+    </div>
+    <div class="chart-card fu" style="grid-column:1/-1">
+      <h3 id="ctx-chart3-title">Yearly Trend for Selected Crop</h3>
+      <div class="chart-area" style="height:220px"><canvas id="ctx-chart3"></canvas></div>
+    </div>
+    <div class="chart-card fu" style="grid-column:1/-1">
+      <h3 id="ctx-chart4-title">Top States for Selected Crop</h3>
+      <div class="chart-area" style="height:260px"><canvas id="ctx-chart4"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA EXPLORER -->
+<section id="data">
+  <div class="section-label">Raw Dataset</div>
+  <div class="section-title">🔍 Data Explorer</div>
+  <div class="section-sub">Live sample of the underlying crop production dataset. Refresh for a new random sample.</div>
+  <div class="glass-card fu">
+    <div class="tbl-toolbar">
+      <input class="tbl-search" id="tbl-search" placeholder="Filter by state, crop, season, district…" oninput="filterTable()"/>
+      <button class="tbl-refresh" onclick="loadTable()">↺ New Sample</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>State</th><th>District</th><th>Year</th>
+          <th>Season</th><th>Crop</th>
+          <th>Area (Ha)</th><th>Production</th><th>Yield (T/Ha)</th>
+        </tr></thead>
+        <tbody id="tbl-body">
+          <tr><td colspan="8"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tbl-foot">
+      <span id="tbl-count">Loading…</span>
+      <span style="color:var(--accent);font-weight:600">Showing random sample of 200</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div style="font-size:1.3rem;margin-bottom:8px">🌾</div>
+  <span class="accent">AgriYield AI</span> &nbsp;·&nbsp;
+  FastAPI + Three.js + Chart.js &nbsp;·&nbsp;
+  Model: <span class="accent">RandomForestRegressor</span> &nbsp;·&nbsp;
+  XAI: <span class="accent">SHAP</span><br/>
+  <span style="font-size:.78rem">Dataset: 246,000+ Indian crop production records</span>
+</footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = "http://localhost:8000";
+let tableData = [];
+let forecastInst = null;
+let chartsLoaded = false;
+
+// ── NAV ──
+function nav(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
+
+// ── TOAST ──
+function toast(msg, type='success', dur=3500){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = type==='error' ? 'show error' : 'show';
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.className='', dur);
+}
+
+// ─────────────────────────────────────────
+//  THREE.JS 3D PARTICLE UNIVERSE
+// ─────────────────────────────────────────
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const renderer = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth, innerHeight);
+
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 1000);
+  cam.position.z = 90;
+
+  // ── PARTICLES ──
+  const N = 4000;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N*3);
+  const col = new Float32Array(N*3);
+  const sizes = new Float32Array(N);
+  const c1=new THREE.Color('#00e5a0'), c2=new THREE.Color('#0ea5e9'), c3=new THREE.Color('#a78bfa');
+  for(let i=0;i<N;i++){
+    const r=60+Math.random()*100, theta=Math.random()*Math.PI*2, phi=Math.acos(2*Math.random()-1);
+    pos[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+    pos[i*3+1] = r*Math.sin(phi)*Math.sin(theta);
+    pos[i*3+2] = r*Math.cos(phi);
+    const t=Math.random(), mix=Math.random();
+    const c = mix<.5 ? c1.clone().lerp(c2,t) : c2.clone().lerp(c3,t);
+    col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+    sizes[i] = .3+Math.random()*1.2;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',   new THREE.BufferAttribute(col,3));
+  const mat = new THREE.PointsMaterial({size:.7,vertexColors:true,transparent:true,opacity:.5,sizeAttenuation:true});
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+
+  // ── INNER CORE GLOW SPHERE ──
+  const coreMat = new THREE.MeshBasicMaterial({
+    color:0x00e5a0, transparent:true, opacity:.03, wireframe:true});
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(28,24,24), coreMat));
+
+  // ── GRID LINES ──
+  const gridMat = new THREE.LineBasicMaterial({color:0x0ea5e9,transparent:true,opacity:.04});
+  for(let i=0;i<20;i++){
+    const ag = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3((Math.random()-.5)*200,(Math.random()-.5)*200,(Math.random()-.5)*200),
+      new THREE.Vector3((Math.random()-.5)*200,(Math.random()-.5)*200,(Math.random()-.5)*200),
+    ]);
+    scene.add(new THREE.Line(ag,gridMat));
+  }
+
+  let mx=0,my=0,tx=0,ty=0;
+  document.addEventListener('mousemove',e=>{
+    mx=(e.clientX/innerWidth-.5)*2;
+    my=(e.clientY/innerHeight-.5)*2;
+  });
+  addEventListener('resize',()=>{
+    cam.aspect=innerWidth/innerHeight;
+    cam.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+
+  let tick=0;
+  (function loop(){
+    requestAnimationFrame(loop);
+    tick+=.002;
+    tx+=(mx-tx)*.04; ty+=(my-ty)*.04;
+    pts.rotation.y = tick*.12+tx*.08;
+    pts.rotation.x = tick*.06+ty*.06;
+    coreMat.opacity = .02+Math.sin(tick*2)*.015;
+    // subtle wave on particles
+    const p=geo.attributes.position.array;
+    for(let i=1;i<N*3;i+=9){p[i]+=Math.sin(tick*1.5+p[i-1]*.02)*.006;}
+    geo.attributes.position.needsUpdate=true;
+    renderer.render(scene,cam);
+  })();
+})();
+
+// ─────────────────────────────────────────
+//  GSAP SCROLL ANIMATIONS
+// ─────────────────────────────────────────
+function initAnimations(){
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const siblings=[...e.target.parentElement.children];
+        const idx=siblings.filter(s=>s.classList.contains('fu')).indexOf(e.target);
+        gsap.to(e.target,{opacity:1,y:0,duration:.75,ease:'power3.out',delay:idx*.08});
+        io.unobserve(e.target);
+      }
+    });
+  },{threshold:.1});
+  document.querySelectorAll('.fu').forEach(el=>io.observe(el));
+}
+
+// ─────────────────────────────────────────
+//  META & STATS
+// ─────────────────────────────────────────
+async function loadMeta(){
+  try{
+    const d=await fetch(`${API}/meta`).then(r=>r.json());
+    populate('f-state',d.states);
+    populate('f-season',d.seasons);
+    populate('f-crop',d.crops);
+  }catch(e){toast('⚠️ Backend offline — run: uvicorn backend.main:app --reload','error');}
+}
+
+function populate(id,arr){
+  const s=document.getElementById(id);
+  s.innerHTML=arr.map(v=>`<option value="${v}">${v.trim()}</option>`).join('');
+}
+
+async function loadStats(){
+  try{
+    const d=await fetch(`${API}/stats`).then(r=>r.json());
+    animNum('s-records',d.total_records);
+    animNum('s-states',d.total_states);
+    animNum('s-crops',d.total_crops);
+    animNum('s-seasons',d.total_seasons);
+    document.getElementById('s-years').textContent=d.year_range;
+    document.getElementById('s-yield').textContent=d.avg_yield;
+  }catch(_){}
+}
+
+function animNum(id,target){
+  const el=document.getElementById(id);
+  const dur=1400,start=Date.now();
+  const t=setInterval(()=>{
+    const p=Math.min((Date.now()-start)/dur,1);
+    const ease=1-Math.pow(1-p,4);
+    el.textContent=Math.floor(ease*target).toLocaleString();
+    if(p>=1){clearInterval(t);el.textContent=target.toLocaleString();}
+  },16);
+}
+
+// ─────────────────────────────────────────
+//  PREDICT
+// ─────────────────────────────────────────
+async function runPredict(){
+  const btn=document.getElementById('predict-btn');
+  btn.disabled=true; btn.textContent='⏳ Processing…';
+
+  const body={
+    state:  document.getElementById('f-state').value,
+    season: document.getElementById('f-season').value,
+    crop:   document.getElementById('f-crop').value,
+    year:   +document.getElementById('f-year').value,
+    area:   +document.getElementById('f-area').value,
+  };
+
+  lastPredParams=body;
+  try{
+    const [pR,fR,sR]=await Promise.all([
+      fetch(`${API}/predict`,pick(body)),
+      fetch(`${API}/forecast`,pick({...body,start_year:body.year,n:5})),
+      fetch(`${API}/shap`,pick(body)),
+    ]);
+    if(!pR.ok) throw new Error(await pR.text());
+    const [pred,fc,shap]=[await pR.json(),await fR.json(),await sR.json()];
+    renderResult(pred,body);
+    renderForecast(fc);
+    renderShap(shap);
+    toast('✅ Prediction complete! Loading contextual analysis…');
+    // Load contextual analytics with user's parameters
+    loadContextual(body.state, body.crop, body.season, body.year);
+    // Update map if it's already open
+    if(mapInst) refreshMap();
+  }catch(e){toast('❌ '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='⚡ Predict Yield';}
+}
+
+function pick(body){
+  return{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
+}
+
+function renderResult(pred,body){
+  const el=document.getElementById('result-panel');
+  el.innerHTML=`
+    <div class="result-main">
+      <div class="rlabel">🌾 Predicted Yield</div>
+      <div class="rval" id="anim-yld">0.00</div>
+      <div class="runit">Tonnes per Hectare (T/Ha)</div>
+    </div>
+    <div class="result-row">
+      <div class="result-mini blue">
+        <div class="rlabel">📦 Production</div>
+        <div class="rval">${pred.production.toLocaleString(undefined,{maximumFractionDigits:1})}</div>
+      </div>
+      <div class="result-mini amber">
+        <div class="rlabel">📐 Area</div>
+        <div class="rval">${body.area} Ha</div>
+      </div>
+    </div>
+    <div class="result-info">
+      <b>${body.crop}</b> &nbsp;·&nbsp; <b>${body.state}</b><br/>
+      Season: <b>${body.season.trim()}</b> &nbsp;·&nbsp; Year: <b>${body.year}</b>
+    </div>`;
+  animDec('anim-yld',pred.yield);
+}
+
+function animDec(id,target){
+  const el=document.getElementById(id);
+  const dur=1000,start=Date.now();
+  const t=setInterval(()=>{
+    const p=Math.min((Date.now()-start)/dur,1);
+    const ease=1-Math.pow(1-p,3);
+    el.textContent=(ease*target).toFixed(2);
+    if(p>=1){clearInterval(t);el.textContent=target.toFixed(2);}
+  },16);
+}
+
+function renderForecast(fc){
+  document.getElementById('forecast-box').style.display='block';
+  if(forecastInst){forecastInst.destroy();}
+  forecastInst=new Chart(document.getElementById('forecast-chart'),{
+    type:'line',
+    data:{labels:fc.years,datasets:[{
+      label:'Yield (T/Ha)',data:fc.yields,
+      borderColor:'#00e5a0',backgroundColor:'rgba(0,229,160,.07)',
+      fill:true,tension:.45,pointBackgroundColor:'#00e5a0',
+      pointRadius:5,pointHoverRadius:8,borderWidth:2.5,
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:tooltipStyle()},
+      scales:{x:axisStyle(),y:axisStyle()},
+    }
+  });
+}
+
+function renderShap(shap){
+  const max=Math.max(...shap.shap_values.map(Math.abs),.0001);
+  const rows=shap.features.map((f,i)=>{
+    const v=shap.shap_values[i];
+    const pct=Math.abs(v)/max*100;
+    const col=v>=0?'#00e5a0':'#f87171';
+    return `<div class="shap-row">
+      <div class="shap-label">${f}</div>
+      <div class="shap-bar-bg">
+        <div class="shap-bar" style="width:${pct}%;background:${col}">
+          ${pct>15?f:''}
+        </div>
+      </div>
+      <div class="shap-val" style="color:${col}">${v>=0?'+':''}${v.toFixed(4)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('shap-content').innerHTML=`
+    <div class="shap-base">
+      Baseline: <b style="color:var(--accent)">${shap.base_value.toFixed(4)}</b> T/Ha
+      &nbsp;·&nbsp; <span style="color:#00e5a0">▮ Positive</span>
+      &nbsp; <span style="color:#f87171">▮ Negative</span>
+    </div>
+    <div>${rows}</div>`;
+}
+
+// ─────────────────────────────────────────
+//  ANALYTICS CHARTS
+// ─────────────────────────────────────────
+function tooltipStyle(){
+  return{backgroundColor:'rgba(2,13,20,.95)',borderColor:'rgba(255,255,255,.1)',
+    borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',cornerRadius:10,padding:10};
+}
+function axisStyle(){
+  return{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}};
+}
+
+const CHART_OPTS={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}},tooltip:tooltipStyle()},
+  scales:{x:axisStyle(),y:axisStyle()}};
+
+async function loadCharts(){
+  if(chartsLoaded)return;
+  chartsLoaded=true;
+  try{
+    const [tc,sd,yt,sh]=await Promise.all([
+      fetch(`${API}/analytics/top-crops`).then(r=>r.json()),
+      fetch(`${API}/analytics/season-distribution`).then(r=>r.json()),
+      fetch(`${API}/analytics/yearly-trend`).then(r=>r.json()),
+      fetch(`${API}/analytics/state-heatmap`).then(r=>r.json()),
+    ]);
+
+    // Top crops horizontal bar
+    new Chart(document.getElementById('chart-topcrop'),{
+      type:'bar',
+      data:{labels:tc.crops,datasets:[{
+        data:tc.yields,
+        backgroundColor:tc.crops.map((_,i)=>`hsla(${155+i*9},75%,55%,.8)`),
+        borderRadius:8,borderSkipped:false,
+      }]},
+      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+    });
+
+    // Season bar
+    new Chart(document.getElementById('chart-season'),{
+      type:'bar',
+      data:{labels:sd.map(r=>r.season.trim()),datasets:[
+        {label:'Mean',data:sd.map(r=>r.mean),backgroundColor:'rgba(0,229,160,.75)',borderRadius:7},
+        {label:'Median',data:sd.map(r=>r.median),backgroundColor:'rgba(14,165,233,.75)',borderRadius:7},
+      ]},
+      options:CHART_OPTS,
+    });
+
+    // Yearly trend line
+    new Chart(document.getElementById('chart-trend'),{
+      type:'line',
+      data:{labels:yt.years,datasets:[{
+        label:'Avg Yield T/Ha',data:yt.yields,
+        borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',
+        fill:true,tension:.45,borderWidth:2.5,
+        pointRadius:3,pointBackgroundColor:'#f59e0b',
+      }]},
+      options:CHART_OPTS,
+    });
+
+    // State bar
+    new Chart(document.getElementById('chart-state'),{
+      type:'bar',
+      data:{labels:sh.states.slice(0,25),datasets:[{
+        data:sh.yields.slice(0,25),
+        backgroundColor:sh.states.slice(0,25).map((_,i)=>`hsla(${200+i*6},70%,55%,.78)`),
+        borderRadius:6,borderSkipped:false,
+      }]},
+      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+    });
+  }catch(e){console.error('Charts failed:',e);}
+}
+
+// ─────────────────────────────────────────
+//  TAB SWITCH
+// ─────────────────────────────────────────
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─────────────────────────────────────────
+//  DATA TABLE
+// ─────────────────────────────────────────
+function seasonBadge(s){
+  const sl=(s||'').trim().toLowerCase();
+  if(sl.includes('kharif')) return `<span class="badge badge-kharif">${s.trim()}</span>`;
+  if(sl.includes('rabi'))   return `<span class="badge badge-rabi">${s.trim()}</span>`;
+  if(sl.includes('whole'))  return `<span class="badge badge-whole">${s.trim()}</span>`;
+  return `<span class="badge badge-other">${s.trim()}</span>`;
+}
+
+async function loadTable(){
+  document.getElementById('tbl-body').innerHTML=
+    '<tr><td colspan="8"><div class="spinner"></div></td></tr>';
+  document.getElementById('tbl-count').textContent='Loading…';
+  try{
+    const d=await fetch(`${API}/data/sample?n=200`).then(r=>r.json());
+    tableData=d;
+    renderTable(d);
+  }catch(e){
+    document.getElementById('tbl-body').innerHTML=
+      '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">'+
+      'Could not load data. Is the backend running?</td></tr>';
+  }
+}
+
+function renderTable(rows){
+  const body=document.getElementById('tbl-body');
+  document.getElementById('tbl-count').textContent=`Showing ${rows.length} records`;
+  if(!rows.length){
+    body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">No matching records</td></tr>';
+    return;
+  }
+  body.innerHTML=rows.map(r=>`<tr>
+    <td><b style="color:var(--text)">${r.State_Name||'—'}</b></td>
+    <td style="color:var(--muted)">${r.District_Name||'—'}</td>
+    <td>${r.Crop_Year||'—'}</td>
+    <td>${seasonBadge(r.Season||'')}</td>
+    <td style="color:var(--accent2)">${r.Crop||'—'}</td>
+    <td>${r.Area!=null?r.Area.toFixed(1):'—'}</td>
+    <td>${r.Production!=null?r.Production.toFixed(1):'—'}</td>
+    <td><b style="color:var(--accent)">${r.Yield!=null?r.Yield.toFixed(3):'—'}</b></td>
+  </tr>`).join('');
+}
+
+function filterTable(){
+  const q=document.getElementById('tbl-search').value.toLowerCase();
+  renderTable(q
+    ? tableData.filter(r=>
+        (r.State_Name||'').toLowerCase().includes(q)||
+        (r.Crop||'').toLowerCase().includes(q)||
+        (r.Season||'').toLowerCase().includes(q)||
+        (r.District_Name||'').toLowerCase().includes(q))
+    : tableData);
+}
+
+// ─────────────────────────────────────────
+//  INDIA CHOROPLETH MAP
+// ─────────────────────────────────────────
+let mapInst=null, geoLayer=null, stateYieldData={}, lastPredParams=null;
+const GEOJSON_URL='https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana.geojson';
+
+// Fuzzy match GeoJSON state name → dataset state name
+function matchState(geoName, dataKeys){
+  const n=geoName.toLowerCase().trim();
+  // direct
+  const direct=dataKeys.find(k=>k.toLowerCase().trim()===n);
+  if(direct)return direct;
+  // partial
+  const partial=dataKeys.find(k=>k.toLowerCase().includes(n)||n.includes(k.toLowerCase().substring(0,6)));
+  return partial||null;
+}
+
+async function initMap(){
+  if(mapInst)return; // already created
+  await new Promise(r=>setTimeout(r,80)); // let tab render
+  mapInst=L.map('india-map',{zoomControl:true,attributionControl:false,
+    center:[22,82],zoom:4.5,minZoom:3,maxZoom:8});
+
+  // Dark tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{
+    subdomains:'abcd',maxZoom:19
+  }).addTo(mapInst);
+
+  // Load yield data then GeoJSON
+  try{
+    stateYieldData=await fetch(`${API}/analytics/state-geo`).then(r=>r.json());
+    await loadGeoJSON(stateYieldData);
+  }catch(e){console.error('Map load failed:',e);}
+}
+
+async function loadGeoJSON(yieldMap){
+  const keys=Object.keys(yieldMap);
+  const vals=Object.values(yieldMap);
+  const mn=Math.min(...vals), mx2=Math.max(...vals);
+
+  function getColor(v){
+    if(v==null)return'#1a2a30';
+    const t=(v-mn)/(mx2-mn||1);
+    // deep blue → green gradient
+    const r=Math.round(2+t*0),g=Math.round(50+t*180),b=Math.round(80+t*20);
+    return `rgb(${Math.round(2*(1-t)+14*t)},${Math.round(50+t*160)},${Math.round(80-t*20)})`;
+  }
+
+  // color scale: dark→teal→green
+  function colorScale(v){
+    if(v==null)return'#1a2a30';
+    const t=Math.pow((v-mn)/(mx2-mn||1),0.5);
+    const colors=[
+      [10,30,44],   // dark blue-grey (low)
+      [0,120,100],  // teal (mid)
+      [0,220,150],  // bright green (high)
+    ];
+    const idx=t*(colors.length-1);
+    const lo=colors[Math.floor(idx)], hi=colors[Math.ceil(idx)||colors.length-1];
+    const f=idx-Math.floor(idx);
+    return `rgb(${Math.round(lo[0]+(hi[0]-lo[0])*f)},${Math.round(lo[1]+(hi[1]-lo[1])*f)},${Math.round(lo[2]+(hi[2]-lo[2])*f)})`;
+  }
+
+  try{
+    const geo=await fetch(GEOJSON_URL).then(r=>r.json());
+    if(geoLayer){mapInst.removeLayer(geoLayer);}
+    geoLayer=L.geoJSON(geo,{
+      style:feature=>{
+        const gName=feature.properties.NAME_1||feature.properties.name||'';
+        const dsName=matchState(gName,keys);
+        const yld=dsName?yieldMap[dsName]:null;
+        return{
+          fillColor:colorScale(yld),
+          weight:1,opacity:.7,color:'rgba(0,229,160,0.25)',
+          fillOpacity:.82
+        };
+      },
+      onEachFeature:(feature,layer)=>{
+        const gName=feature.properties.NAME_1||feature.properties.name||'';
+        const dsName=matchState(gName,keys);
+        const yld=dsName?yieldMap[dsName]:null;
+        layer.on({
+          mouseover:e=>{
+            e.target.setStyle({weight:2.5,color:'#00e5a0',fillOpacity:.95});
+            document.getElementById('map-selected-info').innerHTML=
+              `<b style="color:var(--text)">${dsName||gName}</b> &nbsp;·&nbsp; `+
+              `Avg Yield: <b style="color:var(--accent)">${yld?yld.toFixed(3)+' T/Ha':'No data'}</b>`;
+          },
+          mouseout:e=>{
+            geoLayer.resetStyle(e.target);
+            document.getElementById('map-selected-info').innerHTML='Hover over a state to see details';
+          },
+          click:()=>{
+            if(dsName){
+              document.getElementById('f-state').value=dsName;
+              nav('predict');
+              toast(`📍 State set to ${dsName}`);
+            }
+          }
+        });
+        if(yld!=null){
+          layer.bindPopup(
+            `<b style="font-size:1rem">${dsName||gName}</b><br/>`+
+            `Avg Yield: <b style="color:#00e5a0">${yld.toFixed(3)} T/Ha</b><br/>`+
+            `<span style="font-size:.78rem;color:#64748b">Click to select this state</span>`);
+        }
+      }
+    }).addTo(mapInst);
+
+    // Legend
+    const legend=L.control({position:'bottomright'});
+    legend.onAdd=()=>{
+      const d=L.DomUtil.create('div','map-legend');
+      d.innerHTML=`<b>Avg Yield (T/Ha)</b>`+
+        ['High','Mid','Low'].map((l,i)=>{
+          const v=mx2-(i*(mx2-mn)/2);
+          return `<div class="legend-item"><div class="legend-swatch" style="background:${colorScale(v)}"></div>${l}: ${v.toFixed(1)}</div>`;
+        }).join('');
+      return d;
+    };
+    legend.addTo(mapInst);
+
+    // Info overlay
+    const info=L.control({position:'topleft'});
+    info.onAdd=()=>{
+      const d=L.DomUtil.create('div','map-overlay-info');
+      d.innerHTML='🗺️ <b style="color:#e2e8f0">India Crop Yield Map</b><br/>Hover: details &nbsp;·&nbsp; Click: select state';
+      return d;
+    };
+    info.addTo(mapInst);
+  }catch(e){console.error('GeoJSON fetch failed:',e);}
+}
+
+async function refreshMap(){
+  const metric=document.getElementById('map-metric')?.value;
+  if(!mapInst)return;
+  if(metric==='filtered'&&lastPredParams){
+    // Build filtered yield map for selected state's crop
+    try{
+      const d=await fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(lastPredParams.crop)}`).then(r=>r.json());
+      toast(`🗺️ Map filtered for: ${lastPredParams.crop}`);
+    }catch(e){}
+  }else{
+    stateYieldData=await fetch(`${API}/analytics/state-geo`).then(r=>r.json());
+    await loadGeoJSON(stateYieldData);
+  }
+}
+
+// ─────────────────────────────────────────
+//  CONTEXTUAL ANALYTICS
+// ─────────────────────────────────────────
+let ctxCharts={c1:null,c2:null,c3:null,c4:null};
+
+async function loadContextual(state,crop,season,year){
+  const section=document.getElementById('contextual');
+  section.style.display='block';
+  document.getElementById('ctx-sub').textContent=
+    `Showing data for: ${state.trim()} · ${crop} · ${season.trim()} season`;
+
+  try{
+    const [sd,cd]=await Promise.all([
+      fetch(`${API}/analytics/by-state?state=${encodeURIComponent(state)}`).then(r=>r.json()),
+      fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(crop)}&state=${encodeURIComponent(state)}`).then(r=>r.json()),
+    ]);
+
+    // Stat cards
+    document.getElementById('ctx-stats').innerHTML=`
+      <div class="ctx-stat"><div class="cv">${sd.total_records.toLocaleString()}</div><div class="cl">Records in ${state.length>12?state.substring(0,12)+'…':state}</div></div>
+      <div class="ctx-stat"><div class="cv">${sd.avg_yield}</div><div class="cl">State Avg T/Ha</div></div>
+      <div class="ctx-stat"><div class="cv">${sd.top_crop}</div><div class="cl">Top Crop in State</div></div>
+      <div class="ctx-stat"><div class="cv">${cd.avg_yield}</div><div class="cl">${crop.length>10?crop.substring(0,10)+'…':crop} Avg T/Ha</div></div>
+      <div class="ctx-stat"><div class="cv">${cd.total_records.toLocaleString()}</div><div class="cl">${crop} Records</div></div>`;
+
+    // Destroy old charts
+    Object.values(ctxCharts).forEach(c=>c&&c.destroy());
+
+    // Chart 1: Top crops in state (highlight selected crop)
+    document.getElementById('ctx-chart1-title').textContent=`🌾 Top Crops in ${state.trim()}`;
+    ctxCharts.c1=new Chart(document.getElementById('ctx-chart1'),{
+      type:'bar',
+      data:{labels:sd.top_crops.crops,datasets:[{
+        data:sd.top_crops.yields,
+        backgroundColor:sd.top_crops.crops.map(c=>c===crop?'rgba(0,229,160,.9)':'rgba(14,165,233,.5)'),
+        borderRadius:8,borderSkipped:false,
+      }]},
+      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,
+        legend:{display:false},
+        tooltip:{...tooltipStyle(),callbacks:{label:ctx=>`${ctx.parsed.x.toFixed(3)} T/Ha`}}}}
+    });
+
+    // Chart 2: Season distribution in state (highlight selected season)
+    document.getElementById('ctx-chart2-title').textContent=`📅 Season Distribution in ${state.trim()}`;
+    ctxCharts.c2=new Chart(document.getElementById('ctx-chart2'),{
+      type:'bar',
+      data:{labels:sd.season_dist.map(r=>r.season.trim()),datasets:[{
+        label:'Mean',
+        data:sd.season_dist.map(r=>r.mean),
+        backgroundColor:sd.season_dist.map(r=>r.season.trim()===season.trim()?'rgba(245,158,11,.9)':'rgba(14,165,233,.45)'),
+        borderRadius:7,
+      }]},
+      options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+    });
+
+    // Chart 3: Yearly trend for this crop in this state
+    document.getElementById('ctx-chart3-title').textContent=`📈 Yearly Trend — ${crop} in ${state.trim()}`;
+    ctxCharts.c3=new Chart(document.getElementById('ctx-chart3'),{
+      type:'line',
+      data:{labels:cd.yearly_trend.years,datasets:[{
+        label:'Yield T/Ha',data:cd.yearly_trend.yields,
+        borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.07)',
+        fill:true,tension:.45,borderWidth:2.5,
+        pointRadius:4,pointBackgroundColor:'#a78bfa',
+        pointBorderColor:cd.yearly_trend.years.map(y=>y===year?'#f59e0b':'#a78bfa'),
+        pointRadius:cd.yearly_trend.years.map(y=>y===year?8:4),
+      }]},
+      options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,
+        tooltip:{...tooltipStyle(),callbacks:{label:ctx=>`${ctx.parsed.y.toFixed(3)} T/Ha`}},
+        annotation:{annotations:{line:{type:'line',xMin:year,xMax:year,
+          borderColor:'rgba(245,158,11,.5)',borderWidth:2,borderDash:[4,4]}}}
+      }}
+    });
+
+    // Chart 4: Top states for this crop
+    document.getElementById('ctx-chart4-title').textContent=`🏆 Top States for ${crop}`;
+    ctxCharts.c4=new Chart(document.getElementById('ctx-chart4'),{
+      type:'bar',
+      data:{labels:cd.top_states.states,datasets:[{
+        data:cd.top_states.yields,
+        backgroundColor:cd.top_states.states.map(s=>s===state?'rgba(245,158,11,.9)':'rgba(0,229,160,.45)'),
+        borderRadius:7,borderSkipped:false,
+      }]},
+      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+    });
+
+    section.scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){console.error('Contextual charts failed:',e);}
+}
+
+// ─────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',async()=>{
+  initAnimations();
+  // Load charts when analytics section scrolls into view
+  const io=new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){loadCharts();io.disconnect();}
+  },{threshold:.1});
+  io.observe(document.getElementById('analytics'));
+  await Promise.all([loadMeta(),loadStats(),loadTable()]);
+});
+</script>
+</body>
+</html>
