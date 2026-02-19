@@ -571,21 +571,35 @@ footer .accent{color:var(--accent)}
   </div>
 
   <div class="tab-pane active" id="pane-charts">
+    <!-- Dynamic chart filter bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:24px;padding:16px 20px;background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
+        <span style="font-size:.76rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">Filter charts:</span>
+        <select id="cf-state" onchange="applyChartFilters()" style="background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text);padding:7px 13px;border-radius:10px;font-family:inherit;font-size:.83rem;outline:none;cursor:pointer">
+          <option value="">🌍 All States</option>
+        </select>
+        <select id="cf-crop" onchange="applyChartFilters()" style="background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text);padding:7px 13px;border-radius:10px;font-family:inherit;font-size:.83rem;outline:none;cursor:pointer">
+          <option value="">🌾 All Crops</option>
+        </select>
+        <span id="chart-filter-badge" style="display:none;font-size:.72rem;font-weight:700;padding:4px 12px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.25);border-radius:999px;color:var(--accent)"></span>
+      </div>
+      <button id="chart-reset-btn" onclick="resetChartFilters()" style="display:none;padding:7px 16px;background:transparent;border:1px solid var(--glass-border);color:var(--muted);border-radius:10px;font-family:inherit;font-size:.82rem;cursor:pointer;transition:.2s;white-space:nowrap" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--muted)'">↺ Global View</button>
+    </div>
     <div class="charts-grid">
       <div class="chart-card fu">
-        <h3>🏆 Top 10 Crops by Avg Yield</h3>
+        <h3 id="chart-title-topcrop">🏆 Top 10 Crops by Avg Yield</h3>
         <div class="chart-area"><canvas id="chart-topcrop"></canvas></div>
       </div>
       <div class="chart-card fu">
-        <h3>🌤️ Season-wise Yield (Mean vs Median)</h3>
+        <h3 id="chart-title-season">🌤️ Season-wise Yield (Mean vs Median)</h3>
         <div class="chart-area"><canvas id="chart-season"></canvas></div>
       </div>
       <div class="chart-card fu" style="grid-column:1/-1">
-        <h3>📅 Yearly Average Yield Trend</h3>
+        <h3 id="chart-title-trend">📅 Yearly Average Yield Trend</h3>
         <div class="chart-area" style="height:220px"><canvas id="chart-trend"></canvas></div>
       </div>
       <div class="chart-card fu" style="grid-column:1/-1">
-        <h3>🗺️ Top 25 States by Avg Yield</h3>
+        <h3 id="chart-title-state">🗺️ Top 25 States by Avg Yield</h3>
         <div class="chart-area tall"><canvas id="chart-state"></canvas></div>
       </div>
     </div>
@@ -779,6 +793,7 @@ const API = (location.hostname === "localhost" || location.hostname === "127.0.0
 let tableData = [];
 let forecastInst = null;
 let chartsLoaded = false;
+let mainCharts={topcrop:null,season:null,trend:null,state:null};
 
 // ── NAV ──
 function nav(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
@@ -1703,61 +1718,147 @@ const CHART_OPTS={responsive:true,maintainAspectRatio:false,
   plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}},tooltip:tooltipStyle()},
   scales:{x:axisStyle(),y:axisStyle()}};
 
-async function loadCharts(){
-  if(chartsLoaded)return;
-  chartsLoaded=true;
+async function loadCharts(filterState='',filterCrop=''){
+  const isFiltered=filterState||filterCrop;
+  if(!isFiltered&&chartsLoaded)return;
+  Object.values(mainCharts).forEach(c=>{if(c)c.destroy();});
+  mainCharts={topcrop:null,season:null,trend:null,state:null};
+  const badge=document.getElementById('chart-filter-badge');
+  const resetBtn=document.getElementById('chart-reset-btn');
+  if(isFiltered){
+    chartsLoaded=false;
+    const parts=[filterState?filterState.trim():'',filterCrop||''].filter(Boolean);
+    if(badge){badge.style.display='inline';badge.textContent='📍 '+parts.join(' · ');}
+    if(resetBtn)resetBtn.style.display='';
+  } else {
+    chartsLoaded=true;
+    if(badge)badge.style.display='none';
+    if(resetBtn)resetBtn.style.display='none';
+  }
+  const setTitle=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
   try{
-    const [tc,sd,yt,sh]=await Promise.all([
-      fetch(`${API}/analytics/top-crops`).then(r=>r.json()),
-      fetch(`${API}/analytics/season-distribution`).then(r=>r.json()),
-      fetch(`${API}/analytics/yearly-trend`).then(r=>r.json()),
-      fetch(`${API}/analytics/state-heatmap`).then(r=>r.json()),
-    ]);
-
-    // Top crops horizontal bar
-    new Chart(document.getElementById('chart-topcrop'),{
-      type:'bar',
-      data:{labels:tc.crops,datasets:[{
-        data:tc.yields,
-        backgroundColor:tc.crops.map((_,i)=>`hsla(${155+i*9},75%,55%,.8)`),
-        borderRadius:8,borderSkipped:false,
-      }]},
-      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
-    });
-
-    // Season bar
-    new Chart(document.getElementById('chart-season'),{
-      type:'bar',
-      data:{labels:sd.map(r=>r.season.trim()),datasets:[
-        {label:'Mean',data:sd.map(r=>r.mean),backgroundColor:'rgba(0,229,160,.75)',borderRadius:7},
-        {label:'Median',data:sd.map(r=>r.median),backgroundColor:'rgba(14,165,233,.75)',borderRadius:7},
-      ]},
-      options:CHART_OPTS,
-    });
-
-    // Yearly trend line
-    new Chart(document.getElementById('chart-trend'),{
-      type:'line',
-      data:{labels:yt.years,datasets:[{
-        label:'Avg Yield T/Ha',data:yt.yields,
-        borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',
-        fill:true,tension:.45,borderWidth:2.5,
-        pointRadius:3,pointBackgroundColor:'#f59e0b',
-      }]},
-      options:CHART_OPTS,
-    });
-
-    // State bar
-    new Chart(document.getElementById('chart-state'),{
-      type:'bar',
-      data:{labels:sh.states.slice(0,25),datasets:[{
-        data:sh.yields.slice(0,25),
-        backgroundColor:sh.states.slice(0,25).map((_,i)=>`hsla(${200+i*6},70%,55%,.78)`),
-        borderRadius:6,borderSkipped:false,
-      }]},
-      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
-    });
+    if(isFiltered){
+      const [sd,cd]=await Promise.all([
+        filterState?fetch(`${API}/analytics/by-state?state=${encodeURIComponent(filterState)}`).then(r=>r.json()):Promise.resolve(null),
+        filterCrop?fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(filterCrop)}${filterState?'&state='+encodeURIComponent(filterState):''}`).then(r=>r.json()):Promise.resolve(null),
+      ]);
+      setTitle('chart-title-topcrop', sd?`🏆 Top Crops in ${filterState.trim()}`:'🏆 Top 10 Crops by Avg Yield');
+      if(sd){
+        mainCharts.topcrop=new Chart(document.getElementById('chart-topcrop'),{
+          type:'bar',data:{labels:sd.top_crops.crops,datasets:[{data:sd.top_crops.yields,
+            backgroundColor:sd.top_crops.crops.map((c,i)=>c===filterCrop?'rgba(0,229,160,.9)':`hsla(${155+i*9},75%,55%,.8)`),
+            borderRadius:8,borderSkipped:false}]},
+          options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+        });
+      } else {
+        const tc=await fetch(`${API}/analytics/top-crops`).then(r=>r.json());
+        mainCharts.topcrop=new Chart(document.getElementById('chart-topcrop'),{
+          type:'bar',data:{labels:tc.crops,datasets:[{data:tc.yields,backgroundColor:tc.crops.map((_,i)=>`hsla(${155+i*9},75%,55%,.8)`),borderRadius:8,borderSkipped:false}]},
+          options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+        });
+      }
+      setTitle('chart-title-season', sd?`🌤️ Season Yield in ${filterState.trim()}`:'🌤️ Season-wise Yield (Mean vs Median)');
+      if(sd){
+        mainCharts.season=new Chart(document.getElementById('chart-season'),{
+          type:'bar',data:{labels:sd.season_dist.map(r=>r.season.trim()),datasets:[{label:'Avg Yield',data:sd.season_dist.map(r=>r.mean),backgroundColor:'rgba(0,229,160,.75)',borderRadius:7}]},
+          options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+        });
+      } else {
+        const gl=await fetch(`${API}/analytics/season-distribution`).then(r=>r.json());
+        mainCharts.season=new Chart(document.getElementById('chart-season'),{
+          type:'bar',data:{labels:gl.map(r=>r.season.trim()),datasets:[
+            {label:'Mean',data:gl.map(r=>r.mean),backgroundColor:'rgba(0,229,160,.75)',borderRadius:7},
+            {label:'Median',data:gl.map(r=>r.median),backgroundColor:'rgba(14,165,233,.75)',borderRadius:7}]},
+          options:CHART_OPTS
+        });
+      }
+      setTitle('chart-title-trend', cd?`📅 Yearly Trend — ${filterCrop}${filterState?' in '+filterState.trim():''}`:'📅 Yearly Average Yield Trend');
+      if(cd){
+        mainCharts.trend=new Chart(document.getElementById('chart-trend'),{
+          type:'line',data:{labels:cd.yearly_trend.years,datasets:[{label:'Yield T/Ha',data:cd.yearly_trend.yields,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.45,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#f59e0b'}]},
+          options:CHART_OPTS
+        });
+      } else {
+        const yt=await fetch(`${API}/analytics/yearly-trend`).then(r=>r.json());
+        mainCharts.trend=new Chart(document.getElementById('chart-trend'),{
+          type:'line',data:{labels:yt.years,datasets:[{label:'Avg Yield T/Ha',data:yt.yields,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.45,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#f59e0b'}]},
+          options:CHART_OPTS
+        });
+      }
+      setTitle('chart-title-state', cd?`🗺️ Top States for ${filterCrop}`:'🗺️ Top 25 States by Avg Yield');
+      if(cd){
+        mainCharts.state=new Chart(document.getElementById('chart-state'),{
+          type:'bar',data:{labels:cd.top_states.states,datasets:[{data:cd.top_states.yields,
+            backgroundColor:cd.top_states.states.map((s,i)=>s===filterState?'rgba(245,158,11,.9)':`hsla(${200+i*6},70%,55%,.78)`),
+            borderRadius:6,borderSkipped:false}]},
+          options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+        });
+      } else {
+        const sh=await fetch(`${API}/analytics/state-heatmap`).then(r=>r.json());
+        mainCharts.state=new Chart(document.getElementById('chart-state'),{
+          type:'bar',data:{labels:sh.states.slice(0,25),datasets:[{data:sh.yields.slice(0,25),backgroundColor:sh.states.slice(0,25).map((_,i)=>`hsla(${200+i*6},70%,55%,.78)`),borderRadius:6,borderSkipped:false}]},
+          options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+        });
+      }
+      toast('📊 Charts updated for your selection!');
+    } else {
+      setTitle('chart-title-topcrop','🏆 Top 10 Crops by Avg Yield');
+      setTitle('chart-title-season','🌤️ Season-wise Yield (Mean vs Median)');
+      setTitle('chart-title-trend','📅 Yearly Average Yield Trend');
+      setTitle('chart-title-state','🗺️ Top 25 States by Avg Yield');
+      const [tc,sd,yt,sh]=await Promise.all([
+        fetch(`${API}/analytics/top-crops`).then(r=>r.json()),
+        fetch(`${API}/analytics/season-distribution`).then(r=>r.json()),
+        fetch(`${API}/analytics/yearly-trend`).then(r=>r.json()),
+        fetch(`${API}/analytics/state-heatmap`).then(r=>r.json()),
+      ]);
+      mainCharts.topcrop=new Chart(document.getElementById('chart-topcrop'),{
+        type:'bar',data:{labels:tc.crops,datasets:[{data:tc.yields,backgroundColor:tc.crops.map((_,i)=>`hsla(${155+i*9},75%,55%,.8)`),borderRadius:8,borderSkipped:false}]},
+        options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+      });
+      mainCharts.season=new Chart(document.getElementById('chart-season'),{
+        type:'bar',data:{labels:sd.map(r=>r.season.trim()),datasets:[
+          {label:'Mean',data:sd.map(r=>r.mean),backgroundColor:'rgba(0,229,160,.75)',borderRadius:7},
+          {label:'Median',data:sd.map(r=>r.median),backgroundColor:'rgba(14,165,233,.75)',borderRadius:7}]},
+        options:CHART_OPTS
+      });
+      mainCharts.trend=new Chart(document.getElementById('chart-trend'),{
+        type:'line',data:{labels:yt.years,datasets:[{label:'Avg Yield T/Ha',data:yt.yields,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.45,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#f59e0b'}]},
+        options:CHART_OPTS
+      });
+      mainCharts.state=new Chart(document.getElementById('chart-state'),{
+        type:'bar',data:{labels:sh.states.slice(0,25),datasets:[{data:sh.yields.slice(0,25),backgroundColor:sh.states.slice(0,25).map((_,i)=>`hsla(${200+i*6},70%,55%,.78)`),borderRadius:6,borderSkipped:false}]},
+        options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+      });
+    }
   }catch(e){console.error('Charts failed:',e);}
+}
+function applyChartFilters(){
+  loadCharts(document.getElementById('cf-state').value, document.getElementById('cf-crop').value);
+}
+function resetChartFilters(){
+  document.getElementById('cf-state').value='';
+  document.getElementById('cf-crop').value='';
+  chartsLoaded=false;
+  loadCharts();
+}
+function populateChartFilters(){
+  const cfState=document.getElementById('cf-state');
+  const cfCrop=document.getElementById('cf-crop');
+  if(!cfState||!cfCrop)return;
+  if(cfState.options.length<=1){
+    const fState=document.getElementById('f-state');
+    const fCrop=document.getElementById('f-crop');
+    if(fState)[...fState.options].forEach(o=>{if(o.value){const n=document.createElement('option');n.value=o.value;n.textContent=o.value;cfState.appendChild(n);}});
+    if(fCrop)[...fCrop.options].forEach(o=>{if(o.value){const n=document.createElement('option');n.value=o.value;n.textContent=o.value;cfCrop.appendChild(n);}});
+  }
+  if(lastPredParams){
+    cfState.value=lastPredParams.state||'';
+    cfCrop.value=lastPredParams.crop||'';
+    applyChartFilters();
+  } else if(!chartsLoaded){
+    loadCharts();
+  }
 }
 
 // ─────────────────────────────────────────
@@ -1768,6 +1869,7 @@ function switchTab(id,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('pane-'+id).classList.add('active');
   btn.classList.add('active');
+  if(id==='charts') populateChartFilters();
 }
 
 // ─────────────────────────────────────────
