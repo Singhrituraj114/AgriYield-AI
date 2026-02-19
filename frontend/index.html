@@ -1738,8 +1738,10 @@ const CHART_OPTS={responsive:true,maintainAspectRatio:false,
 async function loadCharts(filterState='',filterCrop=''){
   const isFiltered=filterState||filterCrop;
   if(!isFiltered&&chartsLoaded)return;
-  Object.values(mainCharts).forEach(c=>{if(c)c.destroy();});
+  Object.values(mainCharts).forEach(c=>{try{if(c)c.destroy();}catch(_){}});
   mainCharts={topcrop:null,season:null,trend:null,state:null};
+  // Replace canvas elements entirely to avoid Chart.js "canvas already in use" error
+  ['chart-topcrop','chart-season','chart-trend','chart-state'].forEach(_resetCtxCanvas);
   const badge=document.getElementById('chart-filter-badge');
   const resetBtn=document.getElementById('chart-reset-btn');
   if(isFiltered){
@@ -1755,32 +1757,41 @@ async function loadCharts(filterState='',filterCrop=''){
   const setTitle=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
   try{
     if(isFiltered){
-      const [sd,cd]=await Promise.all([
-        filterState?fetch(`${API}/analytics/by-state?state=${encodeURIComponent(filterState)}`).then(r=>r.json()):Promise.resolve(null),
-        filterCrop?fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(filterCrop)}${filterState?'&state='+encodeURIComponent(filterState):''}`).then(r=>r.json()):Promise.resolve(null),
+      const fsCrop=filterCrop.trim(), fsState=filterState.trim();
+      let [sd, cd]=await Promise.all([
+        filterState?fetch(`${API}/analytics/by-state?state=${encodeURIComponent(fsState)}`).then(r=>r.json()):Promise.resolve(null),
+        filterCrop?fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(fsCrop)}${filterState?'&state='+encodeURIComponent(fsState):''}`).then(r=>r.json()):Promise.resolve(null),
       ]);
-      setTitle('chart-title-topcrop', sd?`🏆 Top Crops in ${filterState.trim()}`:'🏆 Top 10 Crops by Avg Yield');
-      if(sd){
+      // Fallback: crop not grown in that state → fetch globally
+      if(cd && cd.detail){
+        cd = filterCrop ? await fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(fsCrop)}`).then(r=>r.json()) : null;
+      }
+      const sdOk = sd && !sd.detail;
+      const cdOk = cd && !cd.detail;
+      // Chart 1: Top crops in state
+      setTitle('chart-title-topcrop', sdOk?`🏆 Top Crops in ${fsState}`:'🏆 Top 10 Crops by Avg Yield');
+      if(sdOk && sd.top_crops && sd.top_crops.crops.length){
         mainCharts.topcrop=new Chart(document.getElementById('chart-topcrop'),{
-          type:'bar',data:{labels:sd.top_crops.crops,datasets:[{data:sd.top_crops.yields,
-            backgroundColor:sd.top_crops.crops.map((c,i)=>c===filterCrop?'rgba(0,229,160,.9)':`hsla(${155+i*9},75%,55%,.8)`),
+          type:'bar',data:{labels:sd.top_crops.crops.map(c=>c.trim()),datasets:[{data:sd.top_crops.yields,
+            backgroundColor:sd.top_crops.crops.map((c,i)=>c.trim()===fsCrop?'rgba(0,229,160,.9)':`hsla(${155+i*9},75%,55%,.8)`),
             borderRadius:8,borderSkipped:false}]},
           options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
         });
-      } else {
+      } else if(!sdOk){
         const tc=await fetch(`${API}/analytics/top-crops`).then(r=>r.json());
         mainCharts.topcrop=new Chart(document.getElementById('chart-topcrop'),{
           type:'bar',data:{labels:tc.crops,datasets:[{data:tc.yields,backgroundColor:tc.crops.map((_,i)=>`hsla(${155+i*9},75%,55%,.8)`),borderRadius:8,borderSkipped:false}]},
           options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
         });
       }
-      setTitle('chart-title-season', sd?`🌤️ Season Yield in ${filterState.trim()}`:'🌤️ Season-wise Yield (Mean vs Median)');
-      if(sd){
+      // Chart 2: Season distribution
+      setTitle('chart-title-season', sdOk?`🌤️ Season Yield in ${fsState}`:'🌤️ Season-wise Yield (Mean vs Median)');
+      if(sdOk && sd.season_dist && sd.season_dist.length){
         mainCharts.season=new Chart(document.getElementById('chart-season'),{
           type:'bar',data:{labels:sd.season_dist.map(r=>r.season.trim()),datasets:[{label:'Avg Yield',data:sd.season_dist.map(r=>r.mean),backgroundColor:'rgba(0,229,160,.75)',borderRadius:7}]},
           options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
         });
-      } else {
+      } else if(!sdOk){
         const gl=await fetch(`${API}/analytics/season-distribution`).then(r=>r.json());
         mainCharts.season=new Chart(document.getElementById('chart-season'),{
           type:'bar',data:{labels:gl.map(r=>r.season.trim()),datasets:[
@@ -1789,28 +1800,30 @@ async function loadCharts(filterState='',filterCrop=''){
           options:CHART_OPTS
         });
       }
-      setTitle('chart-title-trend', cd?`📅 Yearly Trend — ${filterCrop}${filterState?' in '+filterState.trim():''}`:'📅 Yearly Average Yield Trend');
-      if(cd){
+      // Chart 3: Yearly trend
+      setTitle('chart-title-trend', cdOk?`📅 Yearly Trend — ${fsCrop}${fsState?' in '+fsState:''}`:'📅 Yearly Average Yield Trend');
+      if(cdOk && cd.yearly_trend && cd.yearly_trend.years.length){
         mainCharts.trend=new Chart(document.getElementById('chart-trend'),{
           type:'line',data:{labels:cd.yearly_trend.years,datasets:[{label:'Yield T/Ha',data:cd.yearly_trend.yields,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.45,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#f59e0b'}]},
           options:CHART_OPTS
         });
-      } else {
+      } else if(!cdOk){
         const yt=await fetch(`${API}/analytics/yearly-trend`).then(r=>r.json());
         mainCharts.trend=new Chart(document.getElementById('chart-trend'),{
           type:'line',data:{labels:yt.years,datasets:[{label:'Avg Yield T/Ha',data:yt.yields,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.45,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#f59e0b'}]},
           options:CHART_OPTS
         });
       }
-      setTitle('chart-title-state', cd?`🗺️ Top States for ${filterCrop}`:'🗺️ Top 25 States by Avg Yield');
-      if(cd){
+      // Chart 4: Top states for crop
+      setTitle('chart-title-state', cdOk?`🗺️ Top States for ${fsCrop}`:'🗺️ Top 25 States by Avg Yield');
+      if(cdOk && cd.top_states && cd.top_states.states.length){
         mainCharts.state=new Chart(document.getElementById('chart-state'),{
-          type:'bar',data:{labels:cd.top_states.states,datasets:[{data:cd.top_states.yields,
-            backgroundColor:cd.top_states.states.map((s,i)=>s===filterState?'rgba(245,158,11,.9)':`hsla(${200+i*6},70%,55%,.78)`),
+          type:'bar',data:{labels:cd.top_states.states.map(s=>s.trim()),datasets:[{data:cd.top_states.yields,
+            backgroundColor:cd.top_states.states.map((s,i)=>s.trim()===fsState?'rgba(245,158,11,.9)':`hsla(${200+i*6},70%,55%,.78)`),
             borderRadius:6,borderSkipped:false}]},
           options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
         });
-      } else {
+      } else if(!cdOk){
         const sh=await fetch(`${API}/analytics/state-heatmap`).then(r=>r.json());
         mainCharts.state=new Chart(document.getElementById('chart-state'),{
           type:'bar',data:{labels:sh.states.slice(0,25),datasets:[{data:sh.yields.slice(0,25),backgroundColor:sh.states.slice(0,25).map((_,i)=>`hsla(${200+i*6},70%,55%,.78)`),borderRadius:6,borderSkipped:false}]},
