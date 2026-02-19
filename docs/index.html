@@ -2191,7 +2191,7 @@ async function loadContextual(state,crop,season,year){
     }
 
     section.scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(e){console.error('Contextual charts failed:',e);document.getElementById('ctx-stats').innerHTML='<p style="color:var(--muted);padding:20px 0">⚠️ No contextual data available for this combination.</p>';}}
+  }catch(e){console.error('Contextual charts failed:',e);document.getElementById('ctx-stats').innerHTML='<p style="color:var(--muted);padding:20px 0">⚠️ No contextual data available for this combination.</p>';}
 }
 
 // ─────────────────────────────────────────
