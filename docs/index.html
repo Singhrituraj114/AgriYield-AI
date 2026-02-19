@@ -24,6 +24,30 @@
   --muted:#64748b;
   --r:20px;
 }
+/* ── Animatable CSS custom properties (Chrome/Edge/Safari) ── */
+@property --accent  { syntax:'<color>'; inherits:true; initial-value:#00e5a0; }
+@property --accent2 { syntax:'<color>'; inherits:true; initial-value:#0ea5e9; }
+@property --accent3 { syntax:'<color>'; inherits:true; initial-value:#f59e0b; }
+/* ── Season palette body classes ── */
+body{ transition: --accent 1.4s, --accent2 1.4s, --accent3 1.4s, background-color 1.8s; }
+body.season-kharif  { --accent:#0ea5e9; --accent2:#06b6d4; --accent3:#34d399; background-color:#020d18; }
+body.season-rabi    { --accent:#a3e635; --accent2:#84cc16; --accent3:#fde68a; background-color:#04100a; }
+body.season-summer  { --accent:#f59e0b; --accent2:#ef4444; --accent3:#fde68a; background-color:#0d0800; }
+body.season-winter  { --accent:#93c5fd; --accent2:#c7d2fe; --accent3:#dbeafe; background-color:#030810; }
+body.season-autumn  { --accent:#fb923c; --accent2:#f59e0b; --accent3:#fca5a5; background-color:#0c0500; }
+body.season-whole   { --accent:#00e5a0; --accent2:#0ea5e9; --accent3:#f59e0b; background-color:#020d14; }
+/* ── Season Overlay canvas ── */
+#season-overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  z-index:1;pointer-events:none;opacity:0;
+  transition:opacity 1.6s ease;
+}
+#season-overlay.sx-active{opacity:1;}
+/* ── Reduced motion ── */
+@media(prefers-reduced-motion:reduce){
+  #season-overlay,#weather-canvas{display:none!important;}
+  body,*{transition:color .3s,background-color .3s!important;}
+}
 *{margin:0;padding:0;box-sizing:border-box}
 /* Global dropdown option fix — dark background so text is always readable */
 select option{background:#1a2235;color:#e8f4f8;}
@@ -408,6 +432,7 @@ footer .accent{color:var(--accent)}
 
 <canvas id="bg-canvas"></canvas>
 <canvas id="weather-canvas"></canvas>
+<canvas id="season-overlay"></canvas>
 <div id="season-badge">🌿 Whole Year</div>
 
 <div class="page">
@@ -953,33 +978,186 @@ class WeatherSystem {
     this.raf = requestAnimationFrame(()=>this._loop());
   }
 }
+
+// ─────────────────────────────────────────
+//  SEASON OVERLAY — Leaves, Sunrays, Pollen, Clouds
+// ─────────────────────────────────────────
+class SeasonOverlay {
+  constructor(){
+    this.canvas = document.getElementById('season-overlay');
+    this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+    this.type = null; this.particles = []; this.clouds = null; this.tick = 0; this.raf = null;
+    if(this.canvas) this._resize();
+    window.addEventListener('resize', ()=>this._resize());
+  }
+  _resize(){ if(!this.canvas) return; this.canvas.width=innerWidth; this.canvas.height=innerHeight; }
+  setType(type){
+    cancelAnimationFrame(this.raf);
+    this.type = type; this.particles = []; this.clouds = null; this.tick = 0;
+    if(!this.canvas || !this.ctx){ return; }
+    if(!type || type==='whole'){ this.canvas.classList.remove('sx-active'); return; }
+    this.canvas.classList.add('sx-active');
+    const n = {autumn:45, summer:55, rabi:70, kharif:0, winter:0}[type] || 0;
+    for(let i=0;i<n;i++) this._spawn(true);
+    this._loop();
+  }
+  _spawn(init){
+    const t = this.type;
+    if(t==='autumn'){
+      this.particles.push({
+        x: Math.random()*innerWidth, y: init ? Math.random()*innerHeight : -20,
+        size: 6+Math.random()*10, speed: 0.7+Math.random()*1.4,
+        drift: (Math.random()-.5)*1.5, rot: Math.random()*Math.PI*2,
+        rotSpeed: (Math.random()-.5)*0.06,
+        color: ['#fb923c','#f97316','#ef4444','#f59e0b','#dc2626','#a3e635'][Math.floor(Math.random()*6)],
+        opacity: 0.45+Math.random()*0.45, swing: Math.random()*Math.PI*2, swingSpd: 0.018+Math.random()*0.025
+      });
+    } else if(t==='summer'){
+      this.particles.push({
+        x: Math.random()*innerWidth, y: innerHeight*0.55+Math.random()*innerHeight*0.45,
+        size: 1.2+Math.random()*2.8, speed: 0.25+Math.random()*0.7,
+        drift: (Math.random()-.5)*0.4, wave: Math.random()*Math.PI*2, waveSpd: 0.018+Math.random()*0.02,
+        opacity: 0.12+Math.random()*0.25
+      });
+    } else if(t==='rabi'){
+      this.particles.push({
+        x: Math.random()*innerWidth, y: init ? Math.random()*innerHeight : -10,
+        size: 1.5+Math.random()*2, speed: 0.25+Math.random()*0.55,
+        drift: (Math.random()-.5)*0.7, wave: Math.random()*Math.PI*2, waveSpd: 0.01+Math.random()*0.018,
+        opacity: 0.3+Math.random()*0.45
+      });
+    }
+  }
+  _drawSun(){
+    const ctx=this.ctx, cx=innerWidth*0.87, cy=innerHeight*0.10, k=this.tick;
+    const g1=ctx.createRadialGradient(cx,cy,0,cx,cy,130);
+    g1.addColorStop(0,'rgba(253,224,71,0.13)'); g1.addColorStop(1,'rgba(253,224,71,0)');
+    ctx.fillStyle=g1; ctx.beginPath(); ctx.arc(cx,cy,130,0,Math.PI*2); ctx.fill();
+    const g2=ctx.createRadialGradient(cx,cy,0,cx,cy,40);
+    g2.addColorStop(0,'rgba(255,241,179,0.92)'); g2.addColorStop(0.5,'rgba(251,191,36,0.75)'); g2.addColorStop(1,'rgba(245,158,11,0)');
+    ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(cx,cy,40,0,Math.PI*2); ctx.fill();
+    for(let i=0;i<14;i++){
+      const a=(i/14)*Math.PI*2+k*0.004, len=50+Math.sin(k*0.04+i)*14;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(a);
+      ctx.globalAlpha=0.10+Math.sin(k*0.04+i*0.6)*0.04;
+      ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2.2;
+      ctx.beginPath(); ctx.moveTo(44,0); ctx.lineTo(44+len,0); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  _drawClouds(){
+    const ctx=this.ctx;
+    if(!this.clouds) this.clouds = Array.from({length:5},(_,i)=>({
+      x: Math.random()*innerWidth, y: 30+i*28+Math.random()*20,
+      spd: 0.18+Math.random()*0.25, size: 42+Math.random()*55, op: 0.07+Math.random()*0.09
+    }));
+    this.clouds.forEach(c=>{
+      ctx.save(); ctx.globalAlpha=c.op; ctx.fillStyle='#bae6fd';
+      const s=c.size;
+      ctx.beginPath();
+      ctx.arc(c.x,       c.y,       s*.50, 0, Math.PI*2);
+      ctx.arc(c.x+s*.38, c.y-s*.16, s*.37, 0, Math.PI*2);
+      ctx.arc(c.x-s*.32, c.y-s*.12, s*.32, 0, Math.PI*2);
+      ctx.arc(c.x+s*.65, c.y+s*.05, s*.28, 0, Math.PI*2);
+      ctx.fill(); ctx.restore();
+      c.x += c.spd;
+      if(c.x > innerWidth+s) c.x = -s*2;
+    });
+  }
+  _drawAurora(){
+    const ctx=this.ctx, k=this.tick;
+    for(let i=0;i<3;i++){
+      const y=innerHeight*(0.15+i*0.08)+Math.sin(k*0.008+i*2)*30;
+      const g=ctx.createLinearGradient(0,y-60,0,y+60);
+      g.addColorStop(0,'rgba(147,197,253,0)'); g.addColorStop(0.5,`rgba(${i===0?'147,197,253':i===1?'196,181,253':'186,230,253'},0.06)`); g.addColorStop(1,'rgba(147,197,253,0)');
+      ctx.fillStyle=g; ctx.fillRect(0,y-60,innerWidth,120);
+    }
+  }
+  _loop(){
+    const ctx=this.ctx, t=this.type;
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    this.tick++;
+    if(t==='summer') this._drawSun();
+    else if(t==='kharif') this._drawClouds();
+    else if(t==='winter') this._drawAurora();
+    this.particles.forEach((p,i)=>{
+      ctx.save();
+      if(t==='autumn'){
+        ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.globalAlpha=p.opacity; ctx.fillStyle=p.color;
+        ctx.beginPath(); ctx.ellipse(0,0,p.size,p.size*0.62,0,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=p.opacity*0.28; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=0.6;
+        ctx.beginPath(); ctx.moveTo(-p.size*.75,0); ctx.lineTo(p.size*.75,0); ctx.stroke();
+        p.swing+=p.swingSpd; p.x+=p.drift+Math.sin(p.swing)*1.4; p.y+=p.speed; p.rot+=p.rotSpeed;
+        if(p.y>innerHeight+30||p.x<-60||p.x>innerWidth+60){
+          this.particles[i]=null; this._spawn(false);
+          this.particles.splice(i,1,this.particles[this.particles.length-1]); this.particles.pop();
+        }
+      } else if(t==='summer'){
+        const wx=p.x+Math.sin(p.wave)*5;
+        ctx.globalAlpha=p.opacity;
+        const g=ctx.createRadialGradient(wx,p.y,0,wx,p.y,p.size*2);
+        g.addColorStop(0,'rgba(253,224,71,0.9)'); g.addColorStop(1,'rgba(251,191,36,0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(wx,p.y,p.size*2,0,Math.PI*2); ctx.fill();
+        p.wave+=p.waveSpd; p.y-=p.speed; p.x+=p.drift;
+        if(p.y<innerHeight*0.35||p.x<0||p.x>innerWidth){ p.y=innerHeight+10; p.x=Math.random()*innerWidth; }
+      } else if(t==='rabi'){
+        const wx=p.x+Math.sin(p.wave)*7;
+        ctx.globalAlpha=p.opacity; ctx.fillStyle='rgba(163,230,53,0.85)';
+        ctx.beginPath(); ctx.arc(wx,p.y,p.size,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=p.opacity*0.4; ctx.fillStyle='rgba(254,240,138,0.6)';
+        ctx.beginPath(); ctx.arc(wx+1,p.y-1,p.size*0.5,0,Math.PI*2); ctx.fill();
+        p.wave+=p.waveSpd; p.y+=p.speed; p.x+=p.drift;
+        if(p.y>innerHeight+10){ p.y=-10; p.x=Math.random()*innerWidth; }
+      }
+      ctx.restore();
+    });
+    this.raf = requestAnimationFrame(()=>this._loop());
+  }
+}
+let seasonOverlay;
 let weatherSys;
 
 // ─────────────────────────────────────────
 //  SEASON THEME
 // ─────────────────────────────────────────
 const SEASON_CFG = {
-  'Kharif': { badge:'☔ Kharif', color:'#0ea5e9', tint:'#0ea5e9', weather:'rain' },
-  'Rabi':   { badge:'❄️ Rabi',   color:'#818cf8', tint:'#818cf8', weather:'snow' },
-  'Summer': { badge:'☀️ Summer', color:'#f59e0b', tint:'#f97316', weather:'embers' },
-  'Winter': { badge:'🌨️ Winter', color:'#93c5fd', tint:'#93c5fd', weather:'snow' },
-  'Autumn': { badge:'🍂 Autumn', color:'#fb923c', tint:'#f59e0b', weather:'embers' },
-  'Whole Year': { badge:'🌏 Whole Year', color:'#00e5a0', tint:'#00e5a0', weather:null },
+  'Kharif':     { badge:'☔ Kharif',     cls:'season-kharif', tint:'#0ea5e9', weather:'rain',    overlay:'kharif' },
+  'Rabi':       { badge:'🌾 Rabi',       cls:'season-rabi',   tint:'#a3e635', weather:null,       overlay:'rabi'   },
+  'Summer':     { badge:'☀️ Summer',     cls:'season-summer', tint:'#f97316', weather:'embers',  overlay:'summer' },
+  'Winter':     { badge:'❄️ Winter',     cls:'season-winter', tint:'#93c5fd', weather:'snow',    overlay:'winter' },
+  'Autumn':     { badge:'🍂 Autumn',     cls:'season-autumn', tint:'#f59e0b', weather:'embers',  overlay:'autumn' },
+  'Whole Year': { badge:'🌏 Whole Year', cls:'season-whole',  tint:'#00e5a0', weather:null,       overlay:'whole'  },
 };
+
+const _SEASON_CLASSES = ['season-kharif','season-rabi','season-summer','season-winter','season-autumn','season-whole'];
 
 function setSeasonTheme(season){
   const key = Object.keys(SEASON_CFG).find(k => season && season.toLowerCase().includes(k.toLowerCase()));
   const cfg = key ? SEASON_CFG[key] : SEASON_CFG['Whole Year'];
+
+  // 1. Badge
   const badge = document.getElementById('season-badge');
   if(badge){
     badge.textContent = cfg.badge;
-    badge.style.color = cfg.color;
-    badge.style.borderColor = cfg.color + '55';
-    badge.style.background = cfg.color + '15';
     badge.style.opacity = '1';
+    badge.style.removeProperty('color');
+    badge.style.removeProperty('border-color');
+    badge.style.removeProperty('background');
   }
-  if(window.bgControl) window.bgControl.setTint(cfg.tint || '#00e5a0');
+
+  // 2. Body palette class (animates CSS vars + background-color)
+  _SEASON_CLASSES.forEach(c => document.body.classList.remove(c));
+  document.body.classList.add(cfg.cls);
+
+  // 3. Three.js tint
+  if(window.bgControl) window.bgControl.setTint(cfg.tint);
+
+  // 4. Weather particles
   if(weatherSys) weatherSys.setType(cfg.weather);
+
+  // 5. Season overlay effects
+  if(seasonOverlay) seasonOverlay.setType(cfg.overlay);
 }
 
 // ─────────────────────────────────────────
@@ -1783,6 +1961,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
 
   // Weather system
   weatherSys = new WeatherSystem();
+  seasonOverlay = new SeasonOverlay();
 
   // Ripple on predict button
   const btn = document.getElementById('predict-btn');
