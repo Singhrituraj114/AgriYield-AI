@@ -2077,18 +2077,33 @@ async function loadContextual(state,crop,season,year){
     `Showing data for: ${state.trim()} · ${crop} · ${season.trim()} season`;
 
   try{
-    const [sd,cd]=await Promise.all([
-      fetch(`${API}/analytics/by-state?state=${encodeURIComponent(state)}`).then(r=>r.json()),
-      fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(crop)}&state=${encodeURIComponent(state)}`).then(r=>r.json()),
-    ]);
+    // by-state always works; by-crop may 404 when crop not grown in that state
+    const sdProm = fetch(`${API}/analytics/by-state?state=${encodeURIComponent(state)}`).then(r=>r.json());
+    const cdProm = fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(crop)}&state=${encodeURIComponent(state)}`).then(r=>r.json());
+    let [sd, cd] = await Promise.all([sdProm, cdProm]);
 
+    // Fallback: if crop+state returned no data, retry crop globally
+    if(cd && cd.detail){
+      cd = await fetch(`${API}/analytics/by-crop?crop=${encodeURIComponent(crop)}`).then(r=>r.json());
+    }
+    if(!sd || sd.detail) throw new Error('No state data');
+    const cdOk = cd && !cd.detail;
+
+    // Derive fields the by-state endpoint doesn't return directly
+    const stateAvg = sd.season_dist && sd.season_dist.length
+      ? (sd.season_dist.reduce((a,r)=>a+r.mean,0)/sd.season_dist.length).toFixed(2) : '—';
+    const topCrop  = sd.top_crops && sd.top_crops.crops.length ? sd.top_crops.crops[0].trim() : '—';
+    const cropAvg  = cdOk && cd.avg_yield!=null  ? cd.avg_yield  : '—';
+    const cropRecs = cdOk && cd.total_records!=null ? cd.total_records.toLocaleString() : '—';
+    const sLbl = state.length>14 ? state.substring(0,14)+'…' : state.trim();
+    const cLbl = crop.length>12  ? crop.substring(0,12)+'…'  : crop;
     // Stat cards
     document.getElementById('ctx-stats').innerHTML=`
-      <div class="ctx-stat"><div class="cv">${sd.total_records.toLocaleString()}</div><div class="cl">Records in ${state.length>12?state.substring(0,12)+'…':state}</div></div>
-      <div class="ctx-stat"><div class="cv">${sd.avg_yield}</div><div class="cl">State Avg T/Ha</div></div>
-      <div class="ctx-stat"><div class="cv">${sd.top_crop}</div><div class="cl">Top Crop in State</div></div>
-      <div class="ctx-stat"><div class="cv">${cd.avg_yield}</div><div class="cl">${crop.length>10?crop.substring(0,10)+'…':crop} Avg T/Ha</div></div>
-      <div class="ctx-stat"><div class="cv">${cd.total_records.toLocaleString()}</div><div class="cl">${crop} Records</div></div>`;
+      <div class="ctx-stat"><div class="cv">${topCrop}</div><div class="cl">Top Crop in ${sLbl}</div></div>
+      <div class="ctx-stat"><div class="cv">${stateAvg}</div><div class="cl">State Avg Yield T/Ha</div></div>
+      <div class="ctx-stat"><div class="cv">${sd.season_dist?sd.season_dist.length:'—'}</div><div class="cl">Seasons w/ Data</div></div>
+      <div class="ctx-stat"><div class="cv">${cropAvg}</div><div class="cl">${cLbl} Avg T/Ha</div></div>
+      <div class="ctx-stat"><div class="cv">${cropRecs}</div><div class="cl">${cLbl} Records</div></div>`;
 
     // Destroy old charts
     Object.values(ctxCharts).forEach(c=>c&&c.destroy());
@@ -2120,39 +2135,41 @@ async function loadContextual(state,crop,season,year){
       options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
     });
 
-    // Chart 3: Yearly trend for this crop in this state
-    document.getElementById('ctx-chart3-title').textContent=`📈 Yearly Trend — ${crop} in ${state.trim()}`;
-    ctxCharts.c3=new Chart(document.getElementById('ctx-chart3'),{
-      type:'line',
-      data:{labels:cd.yearly_trend.years,datasets:[{
-        label:'Yield T/Ha',data:cd.yearly_trend.yields,
-        borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.07)',
-        fill:true,tension:.45,borderWidth:2.5,
-        pointRadius:4,pointBackgroundColor:'#a78bfa',
-        pointBorderColor:cd.yearly_trend.years.map(y=>y===year?'#f59e0b':'#a78bfa'),
-        pointRadius:cd.yearly_trend.years.map(y=>y===year?8:4),
-      }]},
-      options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,
-        tooltip:{...tooltipStyle(),callbacks:{label:ctx=>`${ctx.parsed.y.toFixed(3)} T/Ha`}},
-        annotation:{annotations:{line:{type:'line',xMin:year,xMax:year,
-          borderColor:'rgba(245,158,11,.5)',borderWidth:2,borderDash:[4,4]}}}
-      }}
-    });
+    // Chart 3: Yearly trend for this crop (in state if available, else global)
+    if(cdOk && cd.yearly_trend && cd.yearly_trend.years.length){
+      document.getElementById('ctx-chart3-title').textContent=`📈 Yearly Trend — ${crop} in ${state.trim()}`;
+      ctxCharts.c3=new Chart(document.getElementById('ctx-chart3'),{
+        type:'line',
+        data:{labels:cd.yearly_trend.years,datasets:[{
+          label:'Yield T/Ha',data:cd.yearly_trend.yields,
+          borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.07)',
+          fill:true,tension:.45,borderWidth:2.5,
+          pointBackgroundColor:cd.yearly_trend.years.map(y=>y===year?'#f59e0b':'#a78bfa'),
+          pointRadius:cd.yearly_trend.years.map(y=>y===year?8:3),
+        }]},
+        options:{...CHART_OPTS,plugins:{...CHART_OPTS.plugins,
+          tooltip:{...tooltipStyle(),callbacks:{label:ctx=>`${ctx.parsed.y.toFixed(3)} T/Ha`}}}}
+      });
+    } else {
+      document.getElementById('ctx-chart3-title').textContent=`📈 Yearly Trend — ${crop} (no state-specific data)`;
+    }
 
     // Chart 4: Top states for this crop
-    document.getElementById('ctx-chart4-title').textContent=`🏆 Top States for ${crop}`;
-    ctxCharts.c4=new Chart(document.getElementById('ctx-chart4'),{
-      type:'bar',
-      data:{labels:cd.top_states.states,datasets:[{
-        data:cd.top_states.yields,
-        backgroundColor:cd.top_states.states.map(s=>s===state?'rgba(245,158,11,.9)':'rgba(0,229,160,.45)'),
-        borderRadius:7,borderSkipped:false,
-      }]},
-      options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
-    });
+    if(cdOk && cd.top_states && cd.top_states.states.length){
+      document.getElementById('ctx-chart4-title').textContent=`🏆 Top States for ${crop}`;
+      ctxCharts.c4=new Chart(document.getElementById('ctx-chart4'),{
+        type:'bar',
+        data:{labels:cd.top_states.states,datasets:[{
+          data:cd.top_states.yields,
+          backgroundColor:cd.top_states.states.map(s=>s===state?'rgba(245,158,11,.9)':'rgba(0,229,160,.45)'),
+          borderRadius:7,borderSkipped:false,
+        }]},
+        options:{...CHART_OPTS,indexAxis:'y',plugins:{...CHART_OPTS.plugins,legend:{display:false}}}
+      });
+    }
 
     section.scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(e){console.error('Contextual charts failed:',e);}
+  }catch(e){console.error('Contextual charts failed:',e);document.getElementById('ctx-stats').innerHTML='<p style="color:var(--muted);padding:20px 0">⚠️ No contextual data available for this combination.</p>';}
 }
 
 // ─────────────────────────────────────────
