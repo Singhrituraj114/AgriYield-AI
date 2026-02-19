@@ -572,18 +572,16 @@ footer .accent{color:var(--accent)}
 
   <div class="tab-pane active" id="pane-charts">
     <!-- Dynamic chart filter bar -->
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:24px;padding:16px 20px;background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
-        <span style="font-size:.76rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">Filter charts:</span>
-        <select id="cf-state" onchange="applyChartFilters()" style="background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text);padding:7px 13px;border-radius:10px;font-family:inherit;font-size:.83rem;outline:none;cursor:pointer">
-          <option value="">🌍 All States</option>
-        </select>
-        <select id="cf-crop" onchange="applyChartFilters()" style="background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text);padding:7px 13px;border-radius:10px;font-family:inherit;font-size:.83rem;outline:none;cursor:pointer">
-          <option value="">🌾 All Crops</option>
-        </select>
-        <span id="chart-filter-badge" style="display:none;font-size:.72rem;font-weight:700;padding:4px 12px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.25);border-radius:999px;color:var(--accent)"></span>
-      </div>
-      <button id="chart-reset-btn" onclick="resetChartFilters()" style="display:none;padding:7px 16px;background:transparent;border:1px solid var(--glass-border);color:var(--muted);border-radius:10px;font-family:inherit;font-size:.82rem;cursor:pointer;transition:.2s;white-space:nowrap" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--muted)'">↺ Global View</button>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;padding:14px 20px;background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;flex-wrap:wrap">
+      <span style="font-size:.76rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">🔍 Filter Charts</span>
+      <select id="cf-state" onchange="applyChartFilters()" style="flex:1;min-width:160px;background:#0d1b2a;border:1px solid var(--glass-border);color:var(--text);padding:8px 14px;border-radius:10px;font-family:inherit;font-size:.84rem;outline:none;cursor:pointer;transition:border-color .2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        <option value="">🌍 All States</option>
+      </select>
+      <select id="cf-crop" onchange="applyChartFilters()" style="flex:1;min-width:160px;background:#0d1b2a;border:1px solid var(--glass-border);color:var(--text);padding:8px 14px;border-radius:10px;font-family:inherit;font-size:.84rem;outline:none;cursor:pointer;transition:border-color .2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
+        <option value="">🌾 All Crops</option>
+      </select>
+      <span id="chart-filter-badge" style="display:none;font-size:.72rem;font-weight:700;padding:5px 13px;background:rgba(0,229,160,.12);border:1px solid rgba(0,229,160,.3);border-radius:999px;color:var(--accent);white-space:nowrap"></span>
+      <button id="chart-reset-btn" onclick="resetChartFilters()" style="display:none;padding:8px 16px;background:transparent;border:1px solid var(--glass-border);color:var(--muted);border-radius:10px;font-family:inherit;font-size:.82rem;cursor:pointer;transition:.2s;white-space:nowrap" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--muted)'">↺ Global View</button>
     </div>
     <div class="charts-grid">
       <div class="chart-card fu">
@@ -1490,6 +1488,11 @@ async function loadMeta(){
     populate('f-state',d.states);
     populate('f-season',d.seasons);
     populate('f-crop',d.crops);
+    // Populate chart filter dropdowns at the same time
+    const cfState=document.getElementById('cf-state');
+    const cfCrop=document.getElementById('cf-crop');
+    if(cfState&&cfState.options.length<=1) d.states.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v.trim();cfState.appendChild(o);});
+    if(cfCrop&&cfCrop.options.length<=1)   d.crops.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v.trim();cfCrop.appendChild(o);});
     // populate compare crop select
     const cmpSel = document.getElementById('compare-crop-select');
     if(cmpSel) d.crops.forEach(c=>{
@@ -1835,18 +1838,12 @@ function resetChartFilters(){
   loadCharts();
 }
 function populateChartFilters(){
-  const cfState=document.getElementById('cf-state');
-  const cfCrop=document.getElementById('cf-crop');
-  if(!cfState||!cfCrop)return;
-  if(cfState.options.length<=1){
-    const fState=document.getElementById('f-state');
-    const fCrop=document.getElementById('f-crop');
-    if(fState)[...fState.options].forEach(o=>{if(o.value){const n=document.createElement('option');n.value=o.value;n.textContent=o.value;cfState.appendChild(n);}});
-    if(fCrop)[...fCrop.options].forEach(o=>{if(o.value){const n=document.createElement('option');n.value=o.value;n.textContent=o.value;cfCrop.appendChild(n);}});
-  }
+  // cf-state & cf-crop are already filled in loadMeta — just sync from last prediction
   if(lastPredParams){
-    cfState.value=lastPredParams.state||'';
-    cfCrop.value=lastPredParams.crop||'';
+    const cfState=document.getElementById('cf-state');
+    const cfCrop=document.getElementById('cf-crop');
+    if(cfState) cfState.value=lastPredParams.state||'';
+    if(cfCrop)  cfCrop.value=lastPredParams.crop||'';
     applyChartFilters();
   } else if(!chartsLoaded){
     loadCharts();
