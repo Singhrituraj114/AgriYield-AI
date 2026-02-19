@@ -328,15 +328,99 @@ footer .accent{color:var(--accent)}
   letter-spacing:.07em;margin-top:4px}
 .ctx-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:22px}
 
-@media(max-width:700px){
-  nav{padding:16px 24px}
-  section{padding:60px 24px}
-  .stats-row{padding:0 24px 52px}
+/* ═══ HAMBURGER NAV ═══ */
+.nav-hamburger{display:none;flex-direction:column;gap:5px;background:transparent;border:none;cursor:pointer;padding:6px;z-index:210;border-radius:8px;transition:.2s}
+.nav-hamburger span{display:block;width:24px;height:2px;background:var(--text);border-radius:2px;transition:.3s}
+.nav-hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.nav-hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.nav-hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.nav-mobile{display:none;position:fixed;top:0;left:0;width:100%;height:100vh;background:rgba(2,10,18,.97);backdrop-filter:blur(28px);z-index:205;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:80px 0 40px}
+.nav-mobile.open{display:flex}
+.nav-mobile a{color:var(--muted);text-decoration:none;font-size:1.25rem;font-weight:600;padding:18px 40px;width:100%;text-align:center;transition:.2s;letter-spacing:.01em;border-bottom:1px solid rgba(255,255,255,.04)}
+.nav-mobile a:hover,.nav-mobile a:active{color:var(--accent);background:rgba(0,229,160,.04)}
+.nav-mobile .nav-pill{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#020d14!important;border-radius:999px;font-weight:800!important;margin:20px auto 0;width:fit-content;border-bottom:none}
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:900px){
+  .charts-grid{grid-template-columns:1fr}
+  .ctx-charts{grid-template-columns:1fr}
+  .predict-grid{grid-template-columns:1fr}
+  .batch-row{grid-template-columns:1fr 1fr 1fr 1fr;font-size:.75rem}
+  .batch-row.bh{grid-template-columns:1fr 1fr 1fr 1fr}
+}
+@media(max-width:768px){
+  nav{padding:14px 20px}
+  .nav-links{display:none}
+  .nav-hamburger{display:flex}
+  section{padding:56px 20px}
+  .stats-row{padding:0 20px 52px;gap:12px}
+  .section-title{font-size:1.75rem}
+  .section-sub{font-size:.88rem}
+  .hero{padding:48px 20px 36px;gap:20px}
+  .hero h1{font-size:clamp(2.4rem,10vw,3.8rem)}
+  .hero p{font-size:.95rem}
+  .btn-primary,.btn-ghost{padding:13px 28px;font-size:.92rem}
   .form-grid{grid-template-columns:1fr}
   .form-group.full{grid-column:1}
-  .charts-grid{grid-template-columns:1fr}
-  .rec-grid{grid-template-columns:1fr 1fr}
-  .batch-row{grid-template-columns:1fr 1fr}
+  .form-group select,.form-group input[type=number]{padding:12px 14px;font-size:.88rem}
+  .predict-btn{padding:15px;font-size:.93rem}
+  .result-main .rval{font-size:3.2rem}
+  .result-row{grid-template-columns:1fr 1fr}
+  .charts-grid{grid-template-columns:1fr;gap:16px}
+  .ctx-charts{grid-template-columns:1fr;gap:16px}
+  .tab-bar{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-radius:14px}
+  .tab-bar::-webkit-scrollbar{display:none}
+  .tab{padding:10px 18px;font-size:.82rem;white-space:nowrap;flex-shrink:0}
+  .rec-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}
+  .batch-area{font-size:.76rem}
+  .batch-row{grid-template-columns:1fr 1fr;gap:4px;font-size:.74rem;padding:8px 10px}
+  .batch-row.bh{grid-template-columns:1fr 1fr}
+  .batch-row>*:nth-child(n+3){display:none}
+  .cmp-inputs{gap:8px}
+  .cmp-table{font-size:.8rem}
+  .cmp-table th,.cmp-table td{padding:10px 10px}
+  .shap-label{width:54px;font-size:.72rem}
+  .shap-val{width:60px;font-size:.74rem}
+  #india-map{height:380px}
+  #history-panel{width:100%;right:-100%;border-left:none;border-top:1px solid var(--glass-border)}
+  #history-panel.open{right:0}
+  .glass-card{padding:22px 18px}
+  .chart-card{padding:20px 16px}
+  #season-badge{top:auto;bottom:20px;left:50%;transform:translateX(-50%);white-space:nowrap}
+  .tbl-toolbar{flex-direction:column;gap:8px}
+  .tbl-search{min-width:unset;width:100%}
+  .tbl-foot{flex-direction:column;gap:6px;text-align:center}
+  .ctx-stats{grid-template-columns:repeat(2,1fr)}
+  .glass-card:hover,.chart-card:hover{transform:none;animation:none}
+}
+@media(max-width:480px){
+  nav{padding:12px 16px}
+  .nav-logo{font-size:1.1rem}
+  section{padding:44px 16px}
+  .stats-row{padding:0 16px 40px;grid-template-columns:repeat(2,1fr)}
+  .hero{padding:36px 16px 28px}
+  .hero h1{font-size:clamp(2rem,11vw,2.8rem);letter-spacing:-.03em}
+  .hero p{font-size:.88rem}
+  .hero-cta{flex-direction:column;width:100%}
+  .btn-primary,.btn-ghost{width:100%;padding:14px 20px;text-align:center}
+  .section-title{font-size:1.5rem}
+  .result-main{padding:22px 16px}
+  .result-main .rval{font-size:2.8rem}
+  .result-row{grid-template-columns:1fr}
+  .rec-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .rec-card{padding:16px 12px}
+  .rec-yield{font-size:1.3rem}
+  .chart-area{height:200px}
+  .chart-area.tall{height:270px}
+  .tab{padding:9px 14px;font-size:.78rem}
+  .predict-grid{gap:16px}
+  .forecast-wrap{height:160px}
+  .tbl-wrap{border-radius:10px}
+  th{padding:10px 12px}
+  td{padding:9px 12px}
+  .ctx-stats{grid-template-columns:repeat(2,1fr);gap:10px}
+  .ctx-stat .cv{font-size:1.2rem}
+  .cmp-inputs{flex-direction:column}
+  .cmp-select,.cmp-add-btn{width:100%}
 }
 
 /* ═══ WEATHER CANVAS ═══ */
@@ -449,7 +533,19 @@ footer .accent{color:var(--accent)}
     <a onclick="toggleHistory()" style="display:flex;align-items:center;gap:5px">📋 History</a>
     <a class="nav-pill" onclick="nav('predict')">Try Now →</a>
   </div>
+  <button class="nav-hamburger" id="nav-hamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a onclick="closeMobileNav();nav('hero')">Home</a>
+  <a onclick="closeMobileNav();nav('predict')">🔮 Predict</a>
+  <a onclick="closeMobileNav();nav('recommend')">🌱 Recommend</a>
+  <a onclick="closeMobileNav();nav('analytics')">📊 Analytics</a>
+  <a onclick="closeMobileNav();nav('data')">📋 Data</a>
+  <a onclick="closeMobileNav();toggleHistory()">📋 History</a>
+  <a class="nav-pill" onclick="closeMobileNav();nav('predict')">⚡ Try Now →</a>
+</div>
 
 <!-- HERO -->
 <section class="hero" id="hero">
@@ -784,6 +880,16 @@ let chartsLoaded = false;
 
 // ── NAV ──
 function nav(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
+function toggleMobileNav(){
+  const btn=document.getElementById('nav-hamburger'), menu=document.getElementById('nav-mobile');
+  const open=menu.classList.toggle('open'); btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+function closeMobileNav(){
+  document.getElementById('nav-hamburger').classList.remove('open');
+  document.getElementById('nav-mobile').classList.remove('open');
+  document.body.style.overflow='';
+}
 
 // ── TOAST ──
 function toast(msg, type='success', dur=3500){
