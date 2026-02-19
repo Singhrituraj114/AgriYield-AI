@@ -44,6 +44,18 @@ DF["Yield"] = DF["Production"] / DF["Area"]
 # No background data — prevents OOM/segfault on large RandomForest models
 EXPLAINER = shap.TreeExplainer(MODEL)
 
+# ── Normalisation maps: stripped_lower → exact_class ──
+# Handles user input like "Kharif" matching stored "Kharif     "
+_STATE_MAP  = {c.strip().lower(): c for c in LE_STATE.classes_}
+_SEASON_MAP = {c.strip().lower(): c for c in LE_SEASON.classes_}
+_CROP_MAP   = {c.strip().lower(): c for c in LE_CROP.classes_}
+
+def _norm(val: str, mapping: dict, label: str) -> str:
+    key = val.strip().lower()
+    if key not in mapping:
+        raise HTTPException(status_code=422, detail=f"Unknown {label}: '{val.strip()}'. Check spelling.")
+    return mapping[key]
+
 
 # ── Schemas ──
 class PredictReq(BaseModel):
@@ -68,10 +80,10 @@ FEATURE_DISPLAY = ["State",      "Year",      "Season", "Crop", "Area"]
 
 def encode(state, season, year, crop, area):
     return pd.DataFrame([[
-        LE_STATE.transform([state])[0],
+        LE_STATE.transform([_norm(state,  _STATE_MAP,  "state")])[0],
         year,
-        LE_SEASON.transform([season])[0],
-        LE_CROP.transform([crop])[0],
+        LE_SEASON.transform([_norm(season, _SEASON_MAP, "season")])[0],
+        LE_CROP.transform([_norm(crop,   _CROP_MAP,   "crop")])[0],
         area
     ]], columns=FEATURE_COLS)
 
@@ -272,13 +284,15 @@ def recommend(
     n: int = 8,
 ):
     """Batch-predict all crops at once and rank by yield — much faster than one-by-one."""
+    state_norm  = _norm(state,  _STATE_MAP,  "state")
+    season_norm = _norm(season, _SEASON_MAP, "season")
     rows, valid_crops = [], []
     for crop in LE_CROP.classes_:
         try:
             rows.append([
-                LE_STATE.transform([state])[0],
+                LE_STATE.transform([state_norm])[0],
                 year,
-                LE_SEASON.transform([season])[0],
+                LE_SEASON.transform([season_norm])[0],
                 LE_CROP.transform([crop])[0],
                 area,
             ])
@@ -308,10 +322,10 @@ def batch_predict(req: BatchPredictReq):
     for item in req.inputs:
         try:
             rows.append([
-                LE_STATE.transform([item.state])[0],
+                LE_STATE.transform([_norm(item.state,  _STATE_MAP,  "state")])[0],
                 item.year,
-                LE_SEASON.transform([item.season])[0],
-                LE_CROP.transform([item.crop])[0],
+                LE_SEASON.transform([_norm(item.season, _SEASON_MAP, "season")])[0],
+                LE_CROP.transform([_norm(item.crop,   _CROP_MAP,   "crop")])[0],
                 item.area,
             ])
             meta.append(item)
@@ -344,17 +358,19 @@ def crop_compare(
 ):
     """Compare predicted yield across multiple crops."""
     crop_list = [c.strip() for c in crops.split(",")]
+    state_norm  = _norm(state,  _STATE_MAP,  "state")
+    season_norm = _norm(season, _SEASON_MAP, "season")
     rows, valid, errors = [], [], []
     for crop in crop_list:
-        matched = next((c for c in LE_CROP.classes_ if c.strip() == crop), None)
+        matched = next((c for c in LE_CROP.classes_ if c.strip().lower() == crop.lower()), None)
         if not matched:
             errors.append({"crop": crop, "error": f"'{crop}' not in model"})
             continue
         try:
             rows.append([
-                LE_STATE.transform([state])[0],
+                LE_STATE.transform([state_norm])[0],
                 year,
-                LE_SEASON.transform([season])[0],
+                LE_SEASON.transform([season_norm])[0],
                 LE_CROP.transform([matched])[0],
                 area,
             ])
