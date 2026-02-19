@@ -1461,6 +1461,16 @@ const SEASON_CFG = {
 
 const _SEASON_CLASSES = ['season-kharif','season-rabi','season-summer','season-winter','season-autumn','season-whole'];
 
+// Auto-detect current Indian agricultural season by calendar month
+function getCurrentSeason(){
+  const m = new Date().getMonth() + 1; // 1-12
+  if(m >= 6 && m <= 9)    return 'Kharif';  // Jun–Sep  monsoon
+  if(m === 10 || m === 11) return 'Autumn';  // Oct–Nov
+  if(m === 12 || m <= 2)   return 'Winter';  // Dec–Feb
+  if(m >= 3 && m <= 5)     return 'Summer';  // Mar–May
+  return 'Whole Year';
+}
+
 function setSeasonTheme(season){
   const key = Object.keys(SEASON_CFG).find(k => season && season.toLowerCase().includes(k.toLowerCase()));
   const cfg = key ? SEASON_CFG[key] : SEASON_CFG['Whole Year'];
@@ -1515,11 +1525,14 @@ async function loadMeta(){
     if(cmpSel) d.crops.forEach(c=>{
       const o=document.createElement('option'); o.value=c; o.textContent=c; cmpSel.appendChild(o);
     });
-    // season theme on change
+    // season theme on change — sync dropdown to the auto-detected season
     const fSeason = document.getElementById('f-season');
     if(fSeason){
       fSeason.addEventListener('change', e=>setSeasonTheme(e.target.value));
-      setSeasonTheme(fSeason.value);
+      const autoS = getCurrentSeason();
+      const matched = Array.from(fSeason.options).find(o => o.value.toLowerCase().includes(autoS.toLowerCase()));
+      if(matched){ fSeason.value = matched.value; setSeasonTheme(matched.value); }
+      else setSeasonTheme(fSeason.value);
     }
   }catch(e){toast('⚠️ Backend offline — run: uvicorn backend.main:app --reload','error');}
 }
@@ -2378,6 +2391,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Weather system
   weatherSys = new WeatherSystem();
   seasonOverlay = new SeasonOverlay();
+
+  // ── Auto-apply current season immediately (before API loads)
+  //    so effects are visible on the whole site from the first frame
+  setSeasonTheme(getCurrentSeason());
 
   // Ripple on predict button
   const btn = document.getElementById('predict-btn');
